@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.base.json",
+  "include": ["client/src/**/*", "shared/**/*"],
+  "compilerOptions": {
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "jsx": "preserve",
+    "moduleResolution": "bundler",
+    "types": ["vite/client"]
+  }
+}
