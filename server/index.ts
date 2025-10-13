@@ -36,8 +36,12 @@ const isHTTPS = isReplitEnv || isProduction || (!isLocalhost);
 const PgSession = connectPgSimple(session);
 const sessionTtl = 30 * 24 * 60 * 60 * 1000; // 30 days
 
+if (!process.env.SESSION_SECRET) {
+  throw new Error('SESSION_SECRET environment variable is required. Please add it to your Replit Secrets.');
+}
+
 const sessionConfig: any = {
-  secret: process.env.SESSION_SECRET || 'ai-jobhunter-fixed-secret-key',
+  secret: process.env.SESSION_SECRET,
   store: process.env.DATABASE_URL ? new PgSession({
     conString: process.env.DATABASE_URL,
     createTableIfMissing: true,

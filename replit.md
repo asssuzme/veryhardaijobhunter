@@ -145,3 +145,47 @@ Preferred communication style: Technical and detailed explanations with specific
 - **Styling**: Tailwind CSS.
 - **Authentication**: Google OAuth 2.0 (for user authentication and Gmail API access).
 - **APIs**: Apify (for LinkedIn job scraping and email verification), OpenAI (for personalized email generation), Dodo Payments (primary payment gateway for Pro plan subscriptions).
+
+## Required Environment Variables
+
+The following environment variables must be configured in Replit Secrets for the application to function properly:
+
+### Critical (Required for Application to Start)
+- **SESSION_SECRET**: Secure random string for session encryption. Generate using: `openssl rand -base64 32`
+- **DATABASE_URL**: PostgreSQL connection string (auto-configured by Replit Database)
+
+### Google OAuth & Gmail Integration (Required for Authentication)
+- **GOOGLE_CLIENT_ID**: OAuth 2.0 client ID from Google Cloud Console
+- **GOOGLE_CLIENT_SECRET**: OAuth 2.0 client secret from Google Cloud Console
+- Setup Guide: https://console.cloud.google.com/ → APIs & Services → Credentials
+- Required APIs: Google+ API, Gmail API
+- Callback URL: `https://your-repl-url.replit.dev/api/auth/google/callback`
+
+### AI & Job Scraping (Required for Core Features)
+- **OPENAI_API_KEY**: OpenAI API key for email generation (from https://platform.openai.com/)
+- **APIFY_API_KEY**: Apify API token for LinkedIn scraping (from https://apify.com/)
+
+### Payment Processing (Optional - Pro Plan Features)
+- **DODO_API_KEY**: Dodo Payments API key for subscription management
+- **DODO_WEBHOOK_SECRET**: Dodo Payments webhook secret for payment verification
+- Setup Guide: https://dodopayments.com/ → Developer Settings
+- Webhook URL: `https://your-repl-url.replit.dev/api/payments/webhook/dodo`
+
+### Database Configuration (Auto-configured by Replit)
+These are automatically set when you provision a PostgreSQL database in Replit:
+- **PGHOST**: PostgreSQL host
+- **PGPORT**: PostgreSQL port (default: 5432)
+- **PGUSER**: PostgreSQL username
+- **PGPASSWORD**: PostgreSQL password
+- **PGDATABASE**: PostgreSQL database name
+
+## Setup Instructions for New Deployments
+
+1. **Provision Database**: Create a PostgreSQL database in Replit
+2. **Add Required Secrets**: Configure SESSION_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, OPENAI_API_KEY, APIFY_API_KEY
+3. **Initialize Database**: Run `npm run db:push` to create tables
+4. **Start Development**: The workflow will automatically start on port 5000
+5. **Configure OAuth**: Add your Replit URL to Google OAuth authorized redirect URIs
+6. **Test Authentication**: Visit your app and try signing in with Google
+
+Note: Payment features (Dodo Payments) are optional and can be configured later. The app will run without them, with payment features disabled.
