@@ -32,9 +32,24 @@ export function createOAuthClient(req: Request): OAuth2Client {
   
   console.log('Creating OAuth client with redirect URI:', redirectUri);
   
+  // Debug logging for OAuth credentials
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  
+  console.log('OAuth Debug Info:');
+  console.log('- Client ID:', clientId);
+  console.log('- Client ID length:', clientId?.length);
+  console.log('- Client Secret exists:', !!clientSecret);
+  console.log('- Client Secret length:', clientSecret?.length);
+  console.log('- Client Secret starts with GOCSPX:', clientSecret?.startsWith('GOCSPX'));
+  console.log('- Client Secret has spaces:', clientSecret?.includes(' '));
+  console.log('- Client Secret has newlines:', clientSecret?.includes('\n'));
+  console.log('- Client Secret trimmed length:', clientSecret?.trim().length);
+  
+  // Use trimmed values to avoid whitespace issues
   return new OAuth2Client(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
+    clientId?.trim(),
+    clientSecret?.trim(),
     redirectUri
   );
 }
