@@ -137,6 +137,27 @@ export const dodoPayments = pgTable("dodo_payments", {
 export type DodoPayment = typeof dodoPayments.$inferSelect;
 export type InsertDodoPayment = typeof dodoPayments.$inferInsert;
 
+// Vapi Calls table for tracking voice interviews
+export const vapiCalls = pgTable("vapi_calls", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  callId: varchar("call_id").unique().notNull(), // Vapi call ID
+  assistantId: varchar("assistant_id"), // Vapi assistant ID
+  status: varchar("status").notNull(), // started, in_progress, completed, failed
+  transcript: text("transcript"), // Full conversation transcript
+  generatedResume: text("generated_resume"), // Resume generated from transcript
+  duration: integer("duration"), // Call duration in seconds
+  isPaid: boolean("is_paid").default(false), // Whether user paid for this session
+  paymentId: varchar("payment_id"), // Reference to dodo payment
+  errorMessage: text("error_message"),
+  metadata: jsonb("metadata"), // Store additional call info
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+});
+
+export type VapiCall = typeof vapiCalls.$inferSelect;
+export type InsertVapiCall = typeof vapiCalls.$inferInsert;
+
 // Validation schema for LinkedIn URL
 export const linkedinUrlSchema = z.object({
   linkedinUrl: z.string()

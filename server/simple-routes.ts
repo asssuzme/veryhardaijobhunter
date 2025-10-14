@@ -5,6 +5,7 @@ import { users, jobScrapingRequests, emailApplications, gmailCredentials } from 
 import { eq, desc, and, gte, sql } from "drizzle-orm";
 import { registerGmailAuthRoutes } from './routes/gmail-auth';
 import { registerDodoPaymentRoutes } from './routes/dodo-payments-routes';
+import vapiRoutes from './routes/vapi';
 import { refreshGmailToken } from './gmailOAuth';
 import OpenAI from "openai";
 import multer from "multer";
@@ -813,6 +814,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register Dodo Payments routes
   registerDodoPaymentRoutes(app);
+
+  // Register Vapi routes
+  app.use(vapiRoutes);
 
   // CORS configuration for production
   app.use((req, res, next) => {

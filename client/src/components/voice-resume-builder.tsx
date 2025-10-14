@@ -16,7 +16,15 @@ import {
   Play,
   Activity,
   Zap,
-  Headphones
+  Headphones,
+  Phone,
+  Star,
+  Shield,
+  MessageSquare,
+  Clock,
+  TrendingUp,
+  CreditCard,
+  Crown
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -31,6 +39,9 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@/components/ui/alert";
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import Vapi from '@vapi-ai/web';
 
 interface VoiceResumeBuilderProps {
   isOpen: boolean;
@@ -128,7 +139,7 @@ const INTERVIEW_QUESTIONS = [
 ];
 
 export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGenerated }: VoiceResumeBuilderProps) {
-  const [mode, setMode] = useState<'choice' | 'interview' | 'processing' | 'calibration'>('choice');
+  const [mode, setMode] = useState<'choice' | 'interview' | 'processing' | 'calibration' | 'pro-interview'>('choice');
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [isProcessing, setIsProcessing] = useState(false);
@@ -138,6 +149,12 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
   const [isPaused, setIsPaused] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [currentTranscript, setCurrentTranscript] = useState('');
+  
+  // Pro mode states
+  const [isProMode, setIsProMode] = useState(false);
+  const [vapiClient, setVapiClient] = useState<any>(null);
+  const [vapiCallId, setVapiCallId] = useState<string | null>(null);
+  const [vapiStatus, setVapiStatus] = useState<'idle' | 'connecting' | 'connected' | 'ended'>('idle');
   
   // Continuous conversation states
   const [isListening, setIsListening] = useState(false);
@@ -681,6 +698,7 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
   // Start interview
   const startInterview = async (resumeFromSaved = false) => {
     setErrorMessage('');
+    setIsProMode(false);
     
     if (resumeFromSaved && loadSavedProgress()) {
       toast({
@@ -705,6 +723,134 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
       // Start with calibration for new interviews
       calibrateMicrophone();
     }
+  };
+
+  // Start Pro interview with Vapi
+  const startProInterview = async () => {
+    setErrorMessage('');
+    setIsProMode(true);
+    setMode('pro-interview');
+    setVapiStatus('connecting');
+    
+    try {
+      // First check if user has credits or needs to pay
+      const creditsResponse = await apiRequest('/api/resume/vapi/credits');
+      
+      if (creditsResponse.requiresPayment) {
+        // Start Vapi interview (will redirect to payment if needed)
+        const response = await apiRequest('/api/resume/vapi/start-interview', {
+          method: 'POST',
+          body: JSON.stringify({
+            userName: localStorage.getItem('userName') || 'User'
+          })
+        });
+        
+        if (response.requiresPayment) {
+          // Redirect to payment
+          window.location.href = response.paymentUrl;
+          return;
+        }
+        
+        if (response.success && response.callId) {
+          setVapiCallId(response.callId);
+          
+          // Initialize Vapi client
+          const vapi = new Vapi(response.publicKey || process.env.VAPI_PUBLIC_KEY || '');
+          setVapiClient(vapi);
+          
+          // Start the web call
+          await vapi.start(response.assistantId);
+          
+          // Set up event listeners
+          vapi.on('call-start', () => {
+            setVapiStatus('connected');
+            toast({
+              title: "Pro Interview Started",
+              description: "You can now have a natural conversation with our AI coach"
+            });
+          });
+          
+          vapi.on('call-end', async () => {
+            setVapiStatus('ended');
+            // Fetch transcript and generate resume
+            await handleVapiCallEnd(response.callId);
+          });
+          
+          vapi.on('speech-start', () => {
+            // AI is speaking
+          });
+          
+          vapi.on('speech-end', () => {
+            // AI finished speaking
+          });
+          
+          vapi.on('volume-level', (level: number) => {
+            setVoiceLevel(level);
+          });
+          
+          vapi.on('error', (error: any) => {
+            console.error('Vapi error:', error);
+            setErrorMessage('An error occurred during the interview. Please try again.');
+            setVapiStatus('ended');
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error starting Pro interview:', error);
+      toast({
+        title: "Error",
+        description: "Failed to start Pro interview. Please try again.",
+        variant: "destructive"
+      });
+      setMode('choice');
+      setVapiStatus('idle');
+    }
+  };
+
+  // Handle Vapi call end
+  const handleVapiCallEnd = async (callId: string) => {
+    setMode('processing');
+    
+    try {
+      // Get transcript
+      const transcriptResponse = await apiRequest(`/api/resume/vapi/transcript/${callId}`);
+      
+      if (transcriptResponse.success && transcriptResponse.transcript) {
+        // Generate resume from transcript
+        const resumeResponse = await apiRequest('/api/resume/vapi/generate', {
+          method: 'POST',
+          body: JSON.stringify({ callId })
+        });
+        
+        if (resumeResponse.success && resumeResponse.resume) {
+          onResumeGenerated(resumeResponse.resume);
+          toast({
+            title: "Resume Created!",
+            description: "Your professional resume has been generated from your Pro interview"
+          });
+          onClose();
+        }
+      }
+    } catch (error) {
+      console.error('Error processing Vapi call:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate resume. Please contact support.",
+        variant: "destructive"
+      });
+    }
+    
+    setMode('choice');
+    setVapiStatus('idle');
+  };
+
+  // End Pro interview
+  const endProInterview = () => {
+    if (vapiClient) {
+      vapiClient.stop();
+    }
+    setMode('choice');
+    setVapiStatus('idle');
   };
 
   // Pause/Resume interview
@@ -826,7 +972,7 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
                   )}
                 </div>
                 
-                <div className="grid md:grid-cols-2 gap-6">
+                <div className="grid md:grid-cols-3 gap-6">
                   {/* Upload Option */}
                   <Card 
                     className="glass-card p-6 cursor-pointer hover:scale-[1.02] transition-transform"
@@ -847,36 +993,114 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
                     </div>
                   </Card>
                   
-                  {/* Voice Interview Option */}
+                  {/* Free Voice Interview Option */}
                   <Card 
-                    className="glass-card p-6 cursor-pointer hover:scale-[1.02] transition-transform border-purple-500/20"
+                    className="glass-card p-6 cursor-pointer hover:scale-[1.02] transition-transform"
                     onClick={() => startInterview(false)}
                   >
                     <div className="flex flex-col items-center text-center space-y-4">
-                      <div className="p-4 rounded-full bg-purple-500/10 relative">
-                        <Brain className="h-12 w-12 text-purple-400" />
-                        <Sparkles className="h-6 w-6 text-yellow-400 absolute -top-1 -right-1" />
+                      <div className="p-4 rounded-full bg-purple-500/10">
+                        <Mic className="h-12 w-12 text-purple-400" />
                       </div>
                       <div className="flex items-center gap-2 mb-2">
                         <Badge className="bg-green-500/20 text-green-400 border-green-400/30">
-                          <Zap className="h-3 w-3 mr-1" />
-                          Automatic
+                          Free
                         </Badge>
                         <Badge className="bg-blue-500/20 text-blue-400 border-blue-400/30">
                           <Headphones className="h-3 w-3 mr-1" />
-                          Conversational
+                          Voice
                         </Badge>
                       </div>
-                      <h3 className="text-xl font-semibold">AI Interview</h3>
-                      <p className="text-sm text-gray-400">
-                        Have a natural conversation with our AI interviewer. Just speak - no buttons required!
-                      </p>
-                      <Button className="w-full mt-4 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600">
+                      <h3 className="text-xl font-semibold">Free AI Interview</h3>
+                      <ul className="text-sm text-gray-400 text-left space-y-2 mt-3">
+                        <li className="flex items-start gap-2">
+                          <Check className="h-4 w-4 text-green-400 mt-0.5 shrink-0" />
+                          <span>Browser-based recording</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <Check className="h-4 w-4 text-green-400 mt-0.5 shrink-0" />
+                          <span>AI-generated questions</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <Check className="h-4 w-4 text-green-400 mt-0.5 shrink-0" />
+                          <span>Basic transcription</span>
+                        </li>
+                      </ul>
+                      <Button className="w-full mt-4 bg-purple-500 hover:bg-purple-600">
                         <Mic className="h-4 w-4 mr-2" />
-                        Start Conversation
+                        Start Free Interview
                       </Button>
                     </div>
                   </Card>
+                  
+                  {/* Pro Voice Interview Option */}
+                  <Card 
+                    className="glass-card p-6 cursor-pointer hover:scale-[1.02] transition-transform border-gradient-to-r from-yellow-500/30 to-orange-500/30 relative"
+                    onClick={() => startProInterview()}
+                  >
+                    <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                      <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-3 py-1">
+                        <Crown className="h-3 w-3 mr-1" />
+                        PREMIUM
+                      </Badge>
+                    </div>
+                    <div className="flex flex-col items-center text-center space-y-4">
+                      <div className="p-4 rounded-full bg-gradient-to-r from-yellow-500/10 to-orange-500/10 relative">
+                        <Phone className="h-12 w-12 text-yellow-400" />
+                        <Sparkles className="h-6 w-6 text-orange-400 absolute -top-1 -right-1 animate-pulse" />
+                      </div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 text-yellow-400 border-yellow-400/30">
+                          <Star className="h-3 w-3 mr-1" />
+                          Pro
+                        </Badge>
+                        <Badge className="bg-green-500/20 text-green-400 border-green-400/30">
+                          <TrendingUp className="h-3 w-3 mr-1" />
+                          95% Accuracy
+                        </Badge>
+                      </div>
+                      <h3 className="text-xl font-semibold bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
+                        Pro AI Interview
+                      </h3>
+                      <ul className="text-sm text-gray-300 text-left space-y-2 mt-3">
+                        <li className="flex items-start gap-2">
+                          <Star className="h-4 w-4 text-yellow-400 mt-0.5 shrink-0" />
+                          <span>Natural conversation - interrupt anytime</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <Star className="h-4 w-4 text-yellow-400 mt-0.5 shrink-0" />
+                          <span>Professional AI voice (ElevenLabs)</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <Star className="h-4 w-4 text-yellow-400 mt-0.5 shrink-0" />
+                          <span>Smart follow-up questions</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <Star className="h-4 w-4 text-yellow-400 mt-0.5 shrink-0" />
+                          <span>95%+ accurate transcription</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <Star className="h-4 w-4 text-yellow-400 mt-0.5 shrink-0" />
+                          <span>Context-aware responses</span>
+                        </li>
+                      </ul>
+                      <div className="w-full space-y-2 mt-4">
+                        <Button className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-semibold">
+                          <CreditCard className="h-4 w-4 mr-2" />
+                          Start Pro Interview - $2.99
+                        </Button>
+                        <p className="text-xs text-gray-500">One-time payment per session</p>
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+                
+                {/* Feature comparison */}
+                <div className="mt-8 text-center">
+                  <p className="text-sm text-gray-500">
+                    <Shield className="h-4 w-4 inline mr-1" />
+                    All interviews are private and secure. Your data is never shared.
+                  </p>
                 </div>
               </div>
             )}
@@ -1194,6 +1418,151 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
                     <p>This interview is fully automatic - just speak naturally when prompted</p>
                     <p className="mt-1">The AI will detect when you start and stop speaking</p>
                   </div>
+                </div>
+              </Card>
+            )}
+            
+            {mode === 'pro-interview' && (
+              <Card className="glass-card p-8">
+                <div className="space-y-6">
+                  {/* Pro Interview Header */}
+                  <div className="text-center">
+                    <div className="inline-flex items-center gap-2 mb-4">
+                      <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-4 py-1.5 text-sm">
+                        <Crown className="h-4 w-4 mr-1" />
+                        PRO INTERVIEW IN PROGRESS
+                      </Badge>
+                    </div>
+                    <h3 className="text-2xl font-bold mb-2 bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
+                      Professional AI Interview
+                    </h3>
+                    <p className="text-gray-400 max-w-md mx-auto">
+                      Have a natural conversation with our AI career coach. Speak naturally - you can interrupt anytime.
+                    </p>
+                  </div>
+
+                  {/* Vapi Status */}
+                  <div className="flex flex-col items-center space-y-6">
+                    {vapiStatus === 'connecting' && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="flex flex-col items-center space-y-4"
+                      >
+                        <div className="relative">
+                          <motion.div
+                            className="absolute inset-0 rounded-full bg-yellow-400/20"
+                            animate={{ scale: [1, 1.3, 1] }}
+                            transition={{ duration: 2, repeat: Infinity }}
+                          />
+                          <div className="relative p-6 rounded-full bg-gradient-to-r from-yellow-500/10 to-orange-500/10">
+                            <Phone className="h-12 w-12 text-yellow-400 animate-pulse" />
+                          </div>
+                        </div>
+                        <p className="text-yellow-400 font-medium">Connecting to AI Coach...</p>
+                        <div className="w-64">
+                          <Progress value={30} className="h-2" />
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {vapiStatus === 'connected' && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="flex flex-col items-center space-y-6 w-full"
+                      >
+                        {/* Active Call Indicator */}
+                        <div className="relative">
+                          <motion.div
+                            className="absolute inset-0 rounded-full bg-green-400/20"
+                            animate={{ scale: [1, 1.2, 1] }}
+                            transition={{ duration: 1.5, repeat: Infinity }}
+                          />
+                          <div className="relative p-6 rounded-full bg-green-500/10">
+                            <motion.div
+                              animate={{ scale: [1, 1.05, 1] }}
+                              transition={{ duration: 0.8, repeat: Infinity }}
+                            >
+                              <MessageSquare className="h-12 w-12 text-green-400" />
+                            </motion.div>
+                          </div>
+                        </div>
+                        
+                        <div className="text-center">
+                          <p className="text-green-400 font-medium text-lg mb-2">Interview Active</p>
+                          <p className="text-gray-400 text-sm">Speak naturally - the AI is listening</p>
+                        </div>
+
+                        {/* Voice Level Indicator */}
+                        <div className="w-full max-w-md">
+                          <div className="flex items-center gap-3 mb-2">
+                            <Activity className="h-4 w-4 text-gray-400" />
+                            <div className="flex-1 h-2 bg-gray-700 rounded-full overflow-hidden">
+                              <motion.div 
+                                className="h-full bg-gradient-to-r from-green-400 to-blue-400"
+                                animate={{ width: `${Math.min(voiceLevel * 1000, 100)}%` }}
+                                transition={{ duration: 0.1 }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Features during call */}
+                        <div className="grid grid-cols-3 gap-4 mt-6">
+                          <div className="text-center">
+                            <div className="p-3 rounded-lg bg-purple-500/10 inline-block mb-2">
+                              <Zap className="h-6 w-6 text-purple-400" />
+                            </div>
+                            <p className="text-xs text-gray-400">Natural Conversation</p>
+                          </div>
+                          <div className="text-center">
+                            <div className="p-3 rounded-lg bg-blue-500/10 inline-block mb-2">
+                              <Shield className="h-6 w-6 text-blue-400" />
+                            </div>
+                            <p className="text-xs text-gray-400">95% Accuracy</p>
+                          </div>
+                          <div className="text-center">
+                            <div className="p-3 rounded-lg bg-green-500/10 inline-block mb-2">
+                              <Star className="h-6 w-6 text-green-400" />
+                            </div>
+                            <p className="text-xs text-gray-400">Smart AI</p>
+                          </div>
+                        </div>
+
+                        {/* End Call Button */}
+                        <Button
+                          onClick={endProInterview}
+                          variant="outline"
+                          className="mt-4 border-red-500/30 hover:bg-red-500/10 text-red-400"
+                        >
+                          <Phone className="h-4 w-4 mr-2 rotate-[135deg]" />
+                          End Interview
+                        </Button>
+                      </motion.div>
+                    )}
+
+                    {vapiStatus === 'ended' && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="flex flex-col items-center space-y-4"
+                      >
+                        <CheckCircle className="h-16 w-16 text-green-400" />
+                        <p className="text-green-400 font-medium text-lg">Interview Complete!</p>
+                        <p className="text-gray-400">Processing your conversation...</p>
+                      </motion.div>
+                    )}
+                  </div>
+
+                  {/* Error Display */}
+                  {errorMessage && (
+                    <Alert className="bg-red-900/20 border-red-500/30">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Error</AlertTitle>
+                      <AlertDescription>{errorMessage}</AlertDescription>
+                    </Alert>
+                  )}
                 </div>
               </Card>
             )}
