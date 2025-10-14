@@ -4,44 +4,28 @@ import {
   Mic, 
   MicOff, 
   Upload, 
-  User,
+  Brain,
   Sparkles,
   Volume2,
-  ArrowRight,
   CheckCircle,
-  RefreshCw,
-  SkipForward,
-  Pause,
-  Play,
-  FileText,
-  Brain,
-  ArrowLeft,
-  Keyboard,
-  AlertCircle,
-  ChevronDown,
   Loader2,
   Check,
   X,
-  Headphones,
-  RotateCcw,
-  Edit2,
-  Save
+  AlertCircle,
+  Pause,
+  Play,
+  Activity,
+  Zap,
+  Headphones
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { AudioVisualizer } from '@/components/audio-visualizer';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Alert,
   AlertDescription,
@@ -54,6 +38,19 @@ interface VoiceResumeBuilderProps {
   onUploadClick: () => void;
   onResumeGenerated: (resumeText: string) => void;
 }
+
+// Acknowledgment messages between questions
+const ACKNOWLEDGMENTS = [
+  "Great, thank you!",
+  "Perfect, got it.",
+  "Excellent response.",
+  "Thanks for sharing that.",
+  "Wonderful, moving on.",
+  "That's helpful, thanks.",
+  "I appreciate that.",
+  "Great answer!",
+  "Thanks for the details."
+];
 
 const INTERVIEW_QUESTIONS = [
   {
@@ -132,104 +129,97 @@ const INTERVIEW_QUESTIONS = [
 
 export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGenerated }: VoiceResumeBuilderProps) {
   const [mode, setMode] = useState<'choice' | 'interview' | 'processing'>('choice');
-  const [isRecording, setIsRecording] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [currentTranscript, setCurrentTranscript] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
   const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
-  const [isTyping, setIsTyping] = useState(false);
-  const [typedAnswer, setTypedAnswer] = useState('');
-  const [retryCount, setRetryCount] = useState(0);
-  const [showNavigator, setShowNavigator] = useState(false);
-  const [recordedAudio, setRecordedAudio] = useState<Blob | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
   const [completedQuestions, setCompletedQuestions] = useState<Set<string>>(new Set());
+  const [isPaused, setIsPaused] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [currentTranscript, setCurrentTranscript] = useState('');
   
+  // Continuous conversation states
+  const [isListening, setIsListening] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [voiceLevel, setVoiceLevel] = useState(0);
+  const [silenceTimer, setSilenceTimer] = useState(0);
+  const [noSpeechTimer, setNoSpeechTimer] = useState(0);
+  const [conversationState, setConversationState] = useState<'waiting' | 'listening' | 'recording' | 'processing' | 'speaking'>('waiting');
+  
+  // References
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const micStreamRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const noSpeechTimerRef = useRef<NodeJS.Timeout | null>(null);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const audioElementRef = useRef<HTMLAudioElement | null>(null);
+  const vadIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
   const { toast } = useToast();
 
   const currentQuestion = INTERVIEW_QUESTIONS[currentQuestionIndex];
   const progress = ((completedQuestions.size) / INTERVIEW_QUESTIONS.length) * 100;
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    if (mode !== 'interview') return;
+  // Voice Activity Detection Settings
+  const VAD_THRESHOLD = 0.02; // Voice detection threshold
+  const SILENCE_DURATION = 2000; // 2 seconds of silence to stop recording
+  const NO_SPEECH_TIMEOUT = 10000; // 10 seconds with no speech to prompt user
+  const MIN_RECORDING_DURATION = 1000; // Minimum 1 second recording
+  const DEBOUNCE_TIME = 300; // Debounce for voice detection
 
-    const handleKeyPress = (e: KeyboardEvent) => {
-      if (isTyping) return;
+  // Cleanup function
+  const cleanup = useCallback(() => {
+    // Stop all timers
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+    if (noSpeechTimerRef.current) {
+      clearTimeout(noSpeechTimerRef.current);
+      noSpeechTimerRef.current = null;
+    }
+    if (recordingTimerRef.current) {
+      clearTimeout(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    if (vadIntervalRef.current) {
+      clearInterval(vadIntervalRef.current);
+      vadIntervalRef.current = null;
+    }
 
-      switch(e.code) {
-        case 'Space':
-          e.preventDefault();
-          if (!isProcessing) {
-            if (isRecording && !isPaused) {
-              pauseRecording();
-            } else if (isRecording && isPaused) {
-              resumeRecording();
-            } else {
-              startRecording();
-            }
-          }
-          break;
-        case 'Enter':
-          e.preventDefault();
-          if (!isRecording && !isProcessing && (currentTranscript || typedAnswer)) {
-            nextQuestion();
-          }
-          break;
-        case 'ArrowLeft':
-          if (!isRecording && !isProcessing && currentQuestionIndex > 0) {
-            previousQuestion();
-          }
-          break;
-        case 'ArrowRight':
-          if (!isRecording && !isProcessing) {
-            skipQuestion();
-          }
-          break;
-        case 'KeyT':
-          if (e.ctrlKey || e.metaKey) {
-            e.preventDefault();
-            setIsTyping(true);
-          }
-          break;
-      }
-    };
+    // Stop media recorder
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
 
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [mode, isRecording, isPaused, isProcessing, isTyping, currentTranscript, typedAnswer]);
+    // Close audio context
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+
+    // Stop audio stream
+    if (audioStream) {
+      audioStream.getTracks().forEach(track => track.stop());
+    }
+
+    // Cancel speech synthesis
+    window.speechSynthesis.cancel();
+  }, [audioStream]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (mediaRecorderRef.current && isRecording) {
-        mediaRecorderRef.current.stop();
-      }
-      if (recordingTimerRef.current) {
-        clearInterval(recordingTimerRef.current);
-      }
-      if (audioStream) {
-        audioStream.getTracks().forEach(track => track.stop());
-      }
-      if (audioElementRef.current) {
-        audioElementRef.current.pause();
-      }
-      window.speechSynthesis.cancel();
+      cleanup();
     };
-  }, [isRecording, audioStream]);
+  }, [cleanup]);
 
   // Save progress to localStorage
   useEffect(() => {
-    if (mode === 'interview') {
+    if (mode === 'interview' && !isPaused) {
       const progress = {
         currentQuestionIndex,
         answers,
@@ -237,7 +227,7 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
       };
       localStorage.setItem('voiceResumeProgress', JSON.stringify(progress));
     }
-  }, [currentQuestionIndex, answers, completedQuestions, mode]);
+  }, [currentQuestionIndex, answers, completedQuestions, mode, isPaused]);
 
   // Load saved progress
   const loadSavedProgress = () => {
@@ -256,145 +246,205 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
     return false;
   };
 
-  // Speak question using Web Speech API
-  const speakQuestion = (text: string) => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'en-US';
-      utterance.rate = 0.95;
-      utterance.pitch = 1.1;
-      utterance.volume = 0.9;
-      
-      utterance.onstart = () => setIsSpeaking(true);
-      utterance.onend = () => setIsSpeaking(false);
-      utterance.onerror = () => setIsSpeaking(false);
-      
-      window.speechSynthesis.speak(utterance);
-    }
-  };
-
-  const startInterview = (resumeFromSaved = false) => {
-    setMode('interview');
-    setErrorMessage('');
-    
-    if (resumeFromSaved && loadSavedProgress()) {
-      toast({
-        title: "Progress restored",
-        description: "Continuing from where you left off"
-      });
-    } else {
-      setCurrentQuestionIndex(0);
-      setAnswers({});
-      setCompletedQuestions(new Set());
-    }
-    
-    setTimeout(() => {
-      speakQuestion(INTERVIEW_QUESTIONS[currentQuestionIndex].question);
-    }, 500);
-  };
-
-  const startRecording = async () => {
+  // Initialize audio context and analyser for Voice Activity Detection
+  const initializeAudioContext = async () => {
     try {
-      setErrorMessage('');
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          autoGainControl: true
+          autoGainControl: true,
+          sampleRate: 16000
         }
       });
       
       setAudioStream(stream);
       
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm'
-      });
+      // Create audio context for VAD
+      const audioContext = new AudioContext();
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.8;
       
-      audioChunksRef.current = [];
+      const micStream = audioContext.createMediaStreamSource(stream);
+      micStream.connect(analyser);
       
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
-      };
+      audioContextRef.current = audioContext;
+      analyserRef.current = analyser;
+      micStreamRef.current = micStream;
       
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        setRecordedAudio(audioBlob);
-        await transcribeAudio(audioBlob);
-        stream.getTracks().forEach(track => track.stop());
-        setAudioStream(null);
-      };
+      // Start Voice Activity Detection
+      startVAD();
       
-      mediaRecorderRef.current = mediaRecorder;
-      mediaRecorder.start();
-      setIsRecording(true);
-      setIsPaused(false);
-      setRecordingTime(0);
-      
-      recordingTimerRef.current = setInterval(() => {
-        setRecordingTime(prev => prev + 100);
-      }, 100);
-      
-      setTimeout(() => {
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-          stopRecording();
-        }
-      }, currentQuestion.maxDuration);
-      
+      return stream;
     } catch (error) {
       console.error('Error accessing microphone:', error);
       setErrorMessage('Unable to access microphone. Please check your permissions.');
       toast({
         title: "Microphone access denied",
-        description: "Please allow microphone access or use the text input option",
+        description: "Please allow microphone access to continue with the interview",
         variant: "destructive"
       });
+      return null;
     }
   };
 
-  const pauseRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      mediaRecorderRef.current.pause();
-      setIsPaused(true);
-      if (recordingTimerRef.current) {
-        clearInterval(recordingTimerRef.current);
-        recordingTimerRef.current = null;
-      }
-    }
-  };
+  // Voice Activity Detection
+  const startVAD = () => {
+    if (!analyserRef.current) return;
 
-  const resumeRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'paused') {
-      mediaRecorderRef.current.resume();
-      setIsPaused(false);
-      recordingTimerRef.current = setInterval(() => {
-        setRecordingTime(prev => prev + 100);
-      }, 100);
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && 
-        (mediaRecorderRef.current.state === 'recording' || mediaRecorderRef.current.state === 'paused')) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      setIsPaused(false);
+    const dataArray = new Float32Array(analyserRef.current.frequencyBinCount);
+    
+    vadIntervalRef.current = setInterval(() => {
+      if (!analyserRef.current || isPaused) return;
       
-      if (recordingTimerRef.current) {
-        clearInterval(recordingTimerRef.current);
-        recordingTimerRef.current = null;
+      analyserRef.current.getFloatTimeDomainData(dataArray);
+      
+      // Calculate RMS (Root Mean Square) for volume level
+      let sum = 0;
+      for (let i = 0; i < dataArray.length; i++) {
+        sum += dataArray[i] * dataArray[i];
       }
-      setRecordingTime(0);
+      const rms = Math.sqrt(sum / dataArray.length);
+      setVoiceLevel(rms);
+      
+      // Check for voice activity
+      if (conversationState === 'listening' && rms > VAD_THRESHOLD) {
+        // Voice detected - start recording
+        startRecording();
+      } else if (conversationState === 'recording' && rms < VAD_THRESHOLD) {
+        // Silence detected while recording - start silence timer
+        if (!silenceTimerRef.current) {
+          silenceTimerRef.current = setTimeout(() => {
+            stopRecording();
+          }, SILENCE_DURATION);
+        }
+      } else if (conversationState === 'recording' && rms > VAD_THRESHOLD) {
+        // Voice resumed - clear silence timer
+        if (silenceTimerRef.current) {
+          clearTimeout(silenceTimerRef.current);
+          silenceTimerRef.current = null;
+        }
+      }
+    }, 100);
+  };
+
+  // Speak with acknowledgment
+  const speakWithAcknowledgment = (text: string, includeAck: boolean = false) => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      
+      const fullText = includeAck 
+        ? `${ACKNOWLEDGMENTS[Math.floor(Math.random() * ACKNOWLEDGMENTS.length)]} ${text}`
+        : text;
+      
+      const utterance = new SpeechSynthesisUtterance(fullText);
+      utterance.lang = 'en-US';
+      utterance.rate = 0.95;
+      utterance.pitch = 1.1;
+      utterance.volume = 0.9;
+      
+      utterance.onstart = () => {
+        setIsSpeaking(true);
+        setConversationState('speaking');
+      };
+      
+      utterance.onend = () => {
+        setIsSpeaking(false);
+        // After speaking, start listening
+        setTimeout(() => {
+          setConversationState('listening');
+          setIsListening(true);
+          startNoSpeechTimer();
+        }, 500);
+      };
+      
+      utterance.onerror = () => {
+        setIsSpeaking(false);
+        setConversationState('listening');
+        setIsListening(true);
+      };
+      
+      window.speechSynthesis.speak(utterance);
     }
   };
 
+  // Start no speech timer
+  const startNoSpeechTimer = () => {
+    if (noSpeechTimerRef.current) {
+      clearTimeout(noSpeechTimerRef.current);
+    }
+    
+    noSpeechTimerRef.current = setTimeout(() => {
+      // Prompt user if no speech detected
+      speakWithAcknowledgment("I'm listening. Please speak your answer when you're ready.");
+      setNoSpeechTimer(0);
+    }, NO_SPEECH_TIMEOUT);
+  };
+
+  // Start recording
+  const startRecording = () => {
+    if (!audioStream || conversationState !== 'listening') return;
+    
+    // Clear no-speech timer
+    if (noSpeechTimerRef.current) {
+      clearTimeout(noSpeechTimerRef.current);
+      noSpeechTimerRef.current = null;
+    }
+    
+    setConversationState('recording');
+    setIsListening(false);
+    setIsRecording(true);
+    
+    const mediaRecorder = new MediaRecorder(audioStream, {
+      mimeType: 'audio/webm'
+    });
+    
+    audioChunksRef.current = [];
+    
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        audioChunksRef.current.push(event.data);
+      }
+    };
+    
+    mediaRecorder.onstop = async () => {
+      const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+      setIsRecording(false);
+      await transcribeAudio(audioBlob);
+    };
+    
+    mediaRecorderRef.current = mediaRecorder;
+    mediaRecorder.start();
+    
+    // Maximum recording duration
+    recordingTimerRef.current = setTimeout(() => {
+      stopRecording();
+    }, currentQuestion.maxDuration);
+  };
+
+  // Stop recording
+  const stopRecording = () => {
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+    
+    if (recordingTimerRef.current) {
+      clearTimeout(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.stop();
+      setConversationState('processing');
+    }
+  };
+
+  // Transcribe audio
   const transcribeAudio = async (audioBlob: Blob, attempt = 1) => {
     setIsProcessing(true);
-    setCurrentTranscript('Transcribing your response...');
-    setRetryCount(attempt - 1);
+    setConversationState('processing');
     
     try {
       const formData = new FormData();
@@ -419,147 +469,113 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
         return transcribeAudio(audioBlob, attempt + 1);
       }
       
-      setCurrentTranscript(transcribedText);
-      setRetryCount(0);
-      setErrorMessage('');
-      
       if (transcribedText) {
+        setCurrentTranscript(transcribedText);
         setAnswers(prev => ({
           ...prev,
           [currentQuestion.id]: transcribedText
         }));
+        setCompletedQuestions(prev => new Set(Array.from(prev).concat(currentQuestion.id)));
+        
+        // Automatically move to next question
+        setTimeout(() => {
+          moveToNextQuestion();
+        }, 1500);
+      } else {
+        // No text transcribed, go back to listening
+        setConversationState('listening');
+        setIsListening(true);
+        speakWithAcknowledgment("I didn't catch that. Could you please repeat your answer?");
       }
       
     } catch (error) {
       console.error('Transcription error:', error);
       
       if (attempt < 3) {
-        toast({
-          title: `Retrying transcription (${attempt}/3)`,
-          description: "Having trouble transcribing. Trying again...",
-        });
         await new Promise(resolve => setTimeout(resolve, 2000));
         return transcribeAudio(audioBlob, attempt + 1);
       }
       
-      setErrorMessage('Unable to transcribe audio after 3 attempts. Please try again or use text input.');
-      toast({
-        title: "Transcription failed",
-        description: "Please try recording again or use the text input option",
-        variant: "destructive"
-      });
-      setCurrentTranscript('');
+      // Failed after 3 attempts - go back to listening
+      setConversationState('listening');
+      setIsListening(true);
+      speakWithAcknowledgment("I'm having trouble understanding. Let's try again.");
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const playRecording = () => {
-    if (recordedAudio && !isPlaying) {
-      const audio = new Audio(URL.createObjectURL(recordedAudio));
-      audioElementRef.current = audio;
-      
-      audio.onended = () => {
-        setIsPlaying(false);
-      };
-      
-      audio.play();
-      setIsPlaying(true);
-    } else if (audioElementRef.current && isPlaying) {
-      audioElementRef.current.pause();
-      setIsPlaying(false);
-    }
-  };
-
-  const reRecord = () => {
-    setCurrentTranscript('');
-    setRecordedAudio(null);
-    setTypedAnswer('');
-    setErrorMessage('');
-    if (answers[currentQuestion.id]) {
-      const newAnswers = { ...answers };
-      delete newAnswers[currentQuestion.id];
-      setAnswers(newAnswers);
-    }
-    startRecording();
-  };
-
-  const saveTypedAnswer = () => {
-    if (typedAnswer.trim()) {
-      setAnswers(prev => ({
-        ...prev,
-        [currentQuestion.id]: typedAnswer
-      }));
-      setCurrentTranscript(typedAnswer);
-      setIsTyping(false);
-      setCompletedQuestions(prev => new Set(Array.from(prev).concat(currentQuestion.id)));
-    }
-  };
-
-  const nextQuestion = () => {
-    const answer = currentTranscript || typedAnswer || answers[currentQuestion.id];
-    if (answer) {
-      setAnswers(prev => ({
-        ...prev,
-        [currentQuestion.id]: answer
-      }));
-      setCompletedQuestions(prev => new Set(Array.from(prev).concat(currentQuestion.id)));
-    }
-    
+  // Move to next question
+  const moveToNextQuestion = () => {
     if (currentQuestionIndex < INTERVIEW_QUESTIONS.length - 1) {
       setCurrentQuestionIndex(prev => prev + 1);
-      resetQuestionState();
+      setCurrentTranscript('');
+      
+      // Speak next question with acknowledgment
       setTimeout(() => {
-        speakQuestion(INTERVIEW_QUESTIONS[currentQuestionIndex + 1].question);
+        const nextQuestion = INTERVIEW_QUESTIONS[currentQuestionIndex + 1];
+        speakWithAcknowledgment(nextQuestion.question, true);
       }, 500);
     } else {
+      // Interview complete
       generateResume();
     }
   };
 
-  const previousQuestion = () => {
-    if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(prev => prev - 1);
-      resetQuestionState();
-      const prevQuestion = INTERVIEW_QUESTIONS[currentQuestionIndex - 1];
-      setCurrentTranscript(answers[prevQuestion.id] || '');
-      setTimeout(() => {
-        speakQuestion(prevQuestion.question);
-      }, 500);
-    }
-  };
-
-  const skipQuestion = () => {
-    nextQuestion();
-  };
-
-  const jumpToQuestion = (index: number) => {
-    setCurrentQuestionIndex(index);
-    resetQuestionState();
-    const question = INTERVIEW_QUESTIONS[index];
-    setCurrentTranscript(answers[question.id] || '');
-    setShowNavigator(false);
-    setTimeout(() => {
-      speakQuestion(question.question);
-    }, 500);
-  };
-
-  const resetQuestionState = () => {
-    setCurrentTranscript('');
-    setRecordedAudio(null);
-    setTypedAnswer('');
-    setIsTyping(false);
+  // Start interview
+  const startInterview = async (resumeFromSaved = false) => {
+    setMode('interview');
     setErrorMessage('');
-    window.speechSynthesis.cancel();
-    if (audioElementRef.current) {
-      audioElementRef.current.pause();
-      setIsPlaying(false);
+    
+    if (resumeFromSaved && loadSavedProgress()) {
+      toast({
+        title: "Progress restored",
+        description: "Continuing from where you left off"
+      });
+    } else {
+      setCurrentQuestionIndex(0);
+      setAnswers({});
+      setCompletedQuestions(new Set());
+    }
+    
+    // Initialize audio and start conversation
+    const stream = await initializeAudioContext();
+    if (!stream) return;
+    
+    // Start the interview with the first question
+    setTimeout(() => {
+      speakWithAcknowledgment(INTERVIEW_QUESTIONS[currentQuestionIndex].question);
+    }, 1000);
+  };
+
+  // Pause/Resume interview
+  const togglePause = () => {
+    if (isPaused) {
+      setIsPaused(false);
+      speakWithAcknowledgment("Let's continue. " + currentQuestion.question);
+    } else {
+      setIsPaused(true);
+      window.speechSynthesis.cancel();
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        stopRecording();
+      }
+      setConversationState('waiting');
+      setIsListening(false);
     }
   };
 
+  // Stop interview
+  const stopInterview = () => {
+    cleanup();
+    setMode('choice');
+    setIsPaused(false);
+    setConversationState('waiting');
+  };
+
+  // Generate resume
   const generateResume = async () => {
     setMode('processing');
-    window.speechSynthesis.cancel();
+    cleanup();
     localStorage.removeItem('voiceResumeProgress');
     
     try {
@@ -588,7 +604,7 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
         description: "Failed to create resume. Please try again.",
         variant: "destructive"
       });
-      setMode('interview');
+      setMode('choice');
     }
   };
 
@@ -682,13 +698,23 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
                         <Brain className="h-12 w-12 text-purple-400" />
                         <Sparkles className="h-6 w-6 text-yellow-400 absolute -top-1 -right-1" />
                       </div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge className="bg-green-500/20 text-green-400 border-green-400/30">
+                          <Zap className="h-3 w-3 mr-1" />
+                          Automatic
+                        </Badge>
+                        <Badge className="bg-blue-500/20 text-blue-400 border-blue-400/30">
+                          <Headphones className="h-3 w-3 mr-1" />
+                          Conversational
+                        </Badge>
+                      </div>
                       <h3 className="text-xl font-semibold">AI Interview</h3>
                       <p className="text-sm text-gray-400">
-                        No resume? Let our AI interview you and create one in minutes
+                        Have a natural conversation with our AI interviewer. Just speak - no buttons required!
                       </p>
                       <Button className="w-full mt-4 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600">
                         <Mic className="h-4 w-4 mr-2" />
-                        Start Interview
+                        Start Conversation
                       </Button>
                     </div>
                   </Card>
@@ -703,15 +729,6 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={previousQuestion}
-                          disabled={currentQuestionIndex === 0 || isRecording || isProcessing}
-                        >
-                          <ArrowLeft className="h-4 w-4" />
-                        </Button>
-                        
                         <div>
                           <span className="text-sm text-gray-400">
                             Question {currentQuestionIndex + 1} of {INTERVIEW_QUESTIONS.length}
@@ -731,42 +748,29 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
                       </div>
                       
                       <div className="flex items-center gap-2">
-                        <DropdownMenu open={showNavigator} onOpenChange={setShowNavigator}>
-                          <DropdownMenuTrigger asChild>
-                            <Button size="sm" variant="outline">
-                              <ChevronDown className="h-4 w-4 mr-1" />
-                              Navigate
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-56 max-h-64 overflow-y-auto">
-                            {INTERVIEW_QUESTIONS.map((q, idx) => (
-                              <DropdownMenuItem
-                                key={q.id}
-                                onClick={() => jumpToQuestion(idx)}
-                                className={cn(
-                                  "flex items-center justify-between",
-                                  idx === currentQuestionIndex && "bg-purple-900/30"
-                                )}
-                              >
-                                <span className="flex items-center gap-2">
-                                  <span className="text-xs text-gray-500">{idx + 1}.</span>
-                                  {q.shortTitle}
-                                </span>
-                                {completedQuestions.has(q.id) && (
-                                  <Check className="h-3 w-3 text-green-400" />
-                                )}
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <Button
+                          size="sm"
+                          variant={isPaused ? "default" : "outline"}
+                          onClick={togglePause}
+                          className={isPaused ? "bg-yellow-500 hover:bg-yellow-600" : ""}
+                        >
+                          {isPaused ? (
+                            <>
+                              <Play className="h-4 w-4 mr-1" />
+                              Resume
+                            </>
+                          ) : (
+                            <>
+                              <Pause className="h-4 w-4 mr-1" />
+                              Pause
+                            </>
+                          )}
+                        </Button>
                         
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => {
-                            window.speechSynthesis.cancel();
-                            onClose();
-                          }}
+                          onClick={stopInterview}
                         >
                           <X className="h-4 w-4" />
                         </Button>
@@ -778,12 +782,10 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
                     {/* Progress indicators */}
                     <div className="flex gap-1">
                       {INTERVIEW_QUESTIONS.map((q, idx) => (
-                        <button
+                        <div
                           key={q.id}
-                          onClick={() => !isRecording && !isProcessing && jumpToQuestion(idx)}
-                          disabled={isRecording || isProcessing}
                           className={cn(
-                            "flex-1 h-1 rounded-full transition-colors",
+                            "flex-1 h-1 rounded-full transition-all duration-500",
                             completedQuestions.has(q.id) 
                               ? "bg-green-400" 
                               : idx === currentQuestionIndex 
@@ -816,12 +818,6 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
                         <h3 className="text-xl font-medium mb-2">
                           {currentQuestion.question}
                         </h3>
-                        <p className="text-sm text-gray-400">
-                          {isTyping ? 
-                            "Type your answer below" : 
-                            `Speak clearly • Max ${currentQuestion.maxDuration / 1000}s • Press Space to record`
-                          }
-                        </p>
                       </div>
                     </div>
                     
@@ -835,259 +831,152 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
                     )}
                   </motion.div>
                   
-                  {/* Audio Visualizer */}
-                  {isRecording && audioStream && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="bg-black/30 rounded-lg p-4"
-                    >
-                      <AudioVisualizer
-                        isActive={isRecording && !isPaused}
-                        audioStream={audioStream}
-                        type="bars"
-                        className="h-24"
-                      />
-                    </motion.div>
-                  )}
-                  
-                  {/* Recording Controls */}
-                  <div className="flex flex-col items-center space-y-4">
-                    <div className="flex items-center gap-4">
-                      {!isTyping ? (
-                        <>
-                          {/* Record/Stop Button */}
-                          <motion.button
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() => {
-                              if (isRecording) {
-                                stopRecording();
-                              } else {
-                                startRecording();
-                              }
-                            }}
-                            disabled={isProcessing}
-                            className={cn(
-                              "relative p-6 rounded-full transition-all",
-                              isRecording 
-                                ? "bg-red-500/20 hover:bg-red-500/30" 
-                                : "bg-purple-500/20 hover:bg-purple-500/30",
-                              isProcessing && "opacity-50 cursor-not-allowed"
-                            )}
-                          >
-                            {isRecording && !isPaused && (
-                              <motion.div
-                                className="absolute inset-0 rounded-full border-4 border-red-400"
-                                animate={{ scale: [1, 1.2, 1] }}
-                                transition={{ duration: 1.5, repeat: Infinity }}
-                              />
-                            )}
-                            {isRecording ? (
-                              isPaused ? (
-                                <Play className="h-10 w-10 text-yellow-400" />
-                              ) : (
-                                <MicOff className="h-10 w-10 text-red-400" />
-                              )
-                            ) : (
-                              <Mic className="h-10 w-10 text-purple-400" />
-                            )}
-                          </motion.button>
-                          
-                          {/* Pause/Resume Button */}
-                          {isRecording && (
-                            <Button
-                              size="icon"
-                              variant="outline"
-                              onClick={isPaused ? resumeRecording : pauseRecording}
-                              className="rounded-full"
-                            >
-                              {isPaused ? (
-                                <Play className="h-5 w-5" />
-                              ) : (
-                                <Pause className="h-5 w-5" />
-                              )}
-                            </Button>
-                          )}
-                          
-                          {/* Re-record Button */}
-                          {recordedAudio && !isRecording && (
-                            <Button
-                              size="icon"
-                              variant="outline"
-                              onClick={reRecord}
-                              className="rounded-full"
-                            >
-                              <RotateCcw className="h-5 w-5" />
-                            </Button>
-                          )}
-                          
-                          {/* Play Recording Button */}
-                          {recordedAudio && !isRecording && (
-                            <Button
-                              size="icon"
-                              variant="outline"
-                              onClick={playRecording}
-                              className="rounded-full"
-                            >
-                              {isPlaying ? (
-                                <Pause className="h-5 w-5" />
-                              ) : (
-                                <Headphones className="h-5 w-5" />
-                              )}
-                            </Button>
-                          )}
-                          
-                          {/* Type Answer Button */}
-                          {!isRecording && (
-                            <Button
-                              size="icon"
-                              variant="outline"
-                              onClick={() => {
-                                setIsTyping(true);
-                                setTypedAnswer(currentTranscript || answers[currentQuestion.id] || '');
-                              }}
-                              className="rounded-full"
-                            >
-                              <Keyboard className="h-5 w-5" />
-                            </Button>
-                          )}
-                        </>
-                      ) : (
-                        <div className="w-full space-y-3">
-                          <Textarea
-                            value={typedAnswer}
-                            onChange={(e) => setTypedAnswer(e.target.value)}
-                            placeholder="Type your answer here..."
-                            className="min-h-[120px]"
-                            autoFocus
+                  {/* Conversation State Indicator */}
+                  <div className="flex flex-col items-center justify-center py-8 space-y-6">
+                    {conversationState === 'speaking' && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        className="flex flex-col items-center space-y-4"
+                      >
+                        <div className="relative">
+                          <motion.div
+                            className="absolute inset-0 rounded-full bg-purple-400/20"
+                            animate={{ scale: [1, 1.3, 1] }}
+                            transition={{ duration: 2, repeat: Infinity }}
                           />
-                          <div className="flex gap-2">
-                            <Button
-                              onClick={saveTypedAnswer}
-                              disabled={!typedAnswer.trim()}
-                              className="bg-purple-500 hover:bg-purple-600"
-                            >
-                              <Save className="h-4 w-4 mr-2" />
-                              Save Answer
-                            </Button>
-                            <Button
-                              variant="outline"
-                              onClick={() => {
-                                setIsTyping(false);
-                                setTypedAnswer('');
-                              }}
-                            >
-                              Cancel
-                            </Button>
+                          <div className="relative p-6 rounded-full bg-purple-500/10">
+                            <Volume2 className="h-12 w-12 text-purple-400" />
                           </div>
                         </div>
-                      )}
-                    </div>
+                        <p className="text-purple-400 font-medium">AI is speaking...</p>
+                      </motion.div>
+                    )}
                     
-                    {/* Status Text */}
-                    <div className="text-center">
-                      {isRecording && (
-                        <motion.p 
-                          className={cn(
-                            "font-medium",
-                            isPaused ? "text-yellow-400" : "text-red-400 animate-pulse"
-                          )}
-                        >
-                          {isPaused ? 'Paused' : 'Recording...'} ({(recordingTime / 1000).toFixed(1)}s / {currentQuestion.maxDuration / 1000}s)
-                        </motion.p>
-                      )}
-                      {isProcessing && (
-                        <div className="flex items-center justify-center gap-2">
-                          <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
-                          <p className="text-blue-400 font-medium">
-                            Processing your response{retryCount > 0 && ` (Retry ${retryCount}/3)`}...
-                          </p>
+                    {conversationState === 'listening' && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        className="flex flex-col items-center space-y-4"
+                      >
+                        <div className="relative">
+                          <motion.div
+                            className="absolute inset-0 rounded-full bg-blue-400/20"
+                            animate={{ scale: [1, 1.2, 1] }}
+                            transition={{ duration: 1.5, repeat: Infinity }}
+                          />
+                          <div className="relative p-6 rounded-full bg-blue-500/10">
+                            <Mic className="h-12 w-12 text-blue-400" />
+                          </div>
                         </div>
-                      )}
-                      {!isRecording && !isProcessing && !isTyping && (
-                        <div className="space-y-1">
-                          <p className="text-gray-400 text-sm">
-                            Press <kbd className="px-2 py-0.5 bg-gray-700 rounded text-xs">Space</kbd> to record or 
-                            <kbd className="px-2 py-0.5 bg-gray-700 rounded text-xs mx-1">Ctrl+T</kbd> to type
-                          </p>
+                        <div className="text-center space-y-2">
+                          <p className="text-blue-400 font-medium">Listening for your voice...</p>
+                          <p className="text-sm text-gray-500">Just start speaking when ready</p>
                         </div>
-                      )}
-                    </div>
+                        
+                        {/* Voice Level Indicator */}
+                        <div className="w-64 h-2 bg-gray-700 rounded-full overflow-hidden">
+                          <motion.div 
+                            className="h-full bg-blue-400"
+                            animate={{ width: `${Math.min(voiceLevel * 500, 100)}%` }}
+                            transition={{ duration: 0.1 }}
+                          />
+                        </div>
+                      </motion.div>
+                    )}
+                    
+                    {conversationState === 'recording' && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        className="flex flex-col items-center space-y-4"
+                      >
+                        <div className="relative">
+                          <motion.div
+                            className="absolute inset-0 rounded-full bg-red-400/30"
+                            animate={{ scale: [1, 1.3, 1] }}
+                            transition={{ duration: 1, repeat: Infinity }}
+                          />
+                          <div className="relative p-6 rounded-full bg-red-500/20">
+                            <motion.div
+                              animate={{ scale: [1, 1.1, 1] }}
+                              transition={{ duration: 0.5, repeat: Infinity }}
+                            >
+                              <Activity className="h-12 w-12 text-red-400" />
+                            </motion.div>
+                          </div>
+                        </div>
+                        <p className="text-red-400 font-medium animate-pulse">Recording your answer...</p>
+                        
+                        {/* Audio Visualizer */}
+                        {audioStream && (
+                          <div className="w-full max-w-md">
+                            <AudioVisualizer
+                              isActive={true}
+                              audioStream={audioStream}
+                              type="bars"
+                              className="h-20"
+                            />
+                          </div>
+                        )}
+                      </motion.div>
+                    )}
+                    
+                    {conversationState === 'processing' && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        className="flex flex-col items-center space-y-4"
+                      >
+                        <div className="relative p-6 rounded-full bg-green-500/10">
+                          <Loader2 className="h-12 w-12 text-green-400 animate-spin" />
+                        </div>
+                        <p className="text-green-400 font-medium">Processing your response...</p>
+                      </motion.div>
+                    )}
+                    
+                    {isPaused && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="text-center space-y-4"
+                      >
+                        <div className="p-6 rounded-full bg-yellow-500/10 inline-block">
+                          <Pause className="h-12 w-12 text-yellow-400" />
+                        </div>
+                        <div>
+                          <p className="text-yellow-400 font-medium text-lg">Interview Paused</p>
+                          <p className="text-gray-400 text-sm mt-2">Click Resume to continue the conversation</p>
+                        </div>
+                      </motion.div>
+                    )}
                   </div>
                   
-                  {/* Transcript/Answer Display */}
-                  {(currentTranscript || answers[currentQuestion.id]) && !isTyping && (
+                  {/* Current Answer Display */}
+                  {currentTranscript && (
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="p-4 bg-white/5 rounded-lg space-y-2"
+                      className="p-4 bg-white/5 rounded-lg"
                     >
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between mb-2">
                         <span className="text-xs text-gray-400">Your Answer:</span>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            setIsTyping(true);
-                            setTypedAnswer(currentTranscript || answers[currentQuestion.id] || '');
-                          }}
-                        >
-                          <Edit2 className="h-3 w-3 mr-1" />
-                          Edit
-                        </Button>
+                        <CheckCircle className="h-4 w-4 text-green-400" />
                       </div>
                       <p className="text-sm text-gray-300">
-                        {currentTranscript || answers[currentQuestion.id]}
+                        {currentTranscript}
                       </p>
                     </motion.div>
                   )}
                   
-                  {/* Action Buttons */}
-                  <div className="flex justify-between pt-4 border-t border-white/10">
-                    <Button
-                      variant="outline"
-                      onClick={skipQuestion}
-                      disabled={isRecording || isProcessing}
-                    >
-                      <SkipForward className="h-4 w-4 mr-2" />
-                      Skip
-                    </Button>
-                    
-                    <div className="flex gap-2">
-                      {currentQuestionIndex > 0 && (
-                        <Button
-                          variant="outline"
-                          onClick={previousQuestion}
-                          disabled={isRecording || isProcessing}
-                        >
-                          <ArrowLeft className="h-4 w-4 mr-2" />
-                          Previous
-                        </Button>
-                      )}
-                      
-                      <Button
-                        onClick={nextQuestion}
-                        disabled={
-                          (!currentTranscript && !typedAnswer && !answers[currentQuestion.id]) || 
-                          isRecording || 
-                          isProcessing
-                        }
-                        className="bg-gradient-to-r from-blue-500 to-purple-500"
-                      >
-                        {currentQuestionIndex === INTERVIEW_QUESTIONS.length - 1 ? 'Finish' : 'Next'}
-                        <ArrowRight className="h-4 w-4 ml-2" />
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  {/* Keyboard Shortcuts Help */}
-                  <div className="text-center text-xs text-gray-500">
-                    <span className="inline-flex items-center gap-2">
-                      <kbd className="px-1.5 py-0.5 bg-gray-700 rounded">Space</kbd> Record
-                      <kbd className="px-1.5 py-0.5 bg-gray-700 rounded">Enter</kbd> Next
-                      <kbd className="px-1.5 py-0.5 bg-gray-700 rounded">←/→</kbd> Navigate
-                    </span>
+                  {/* Instructions */}
+                  <div className="text-center text-xs text-gray-500 pt-4 border-t border-white/10">
+                    <p>This interview is fully automatic - just speak naturally when prompted</p>
+                    <p className="mt-1">The AI will detect when you start and stop speaking</p>
                   </div>
                 </div>
               </Card>
