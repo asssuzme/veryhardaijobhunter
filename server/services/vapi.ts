@@ -26,125 +26,146 @@ const INTERVIEW_QUESTIONS = [
 
 // Create assistant configuration
 export const createResumeAssistant = async () => {
+  console.log('Creating new Vapi assistant...');
+  
   try {
-    const assistant = await vapi.assistants.create({
+    // Simplified configuration for initial testing
+    const assistantConfig: any = {
       name: "Professional Resume Builder",
       model: {
-        provider: "openai",
-        model: "gpt-4",
+        provider: "openai" as const,
+        model: "gpt-3.5-turbo", // Start with 3.5 for faster responses
         temperature: 0.7,
         messages: [
           {
-            role: "system",
-            content: `You are a professional career coach conducting a resume interview. Your goal is to gather comprehensive information about the candidate's professional background to create a compelling resume.
+            role: "system" as const,
+            content: `You are a professional career coach conducting a resume interview. Be warm and professional.
 
-Guidelines:
-1. Be warm, professional, and encouraging
-2. Ask one question at a time
-3. Listen carefully and ask relevant follow-up questions
-4. Keep the conversation natural and flowing
-5. Acknowledge responses positively before moving to the next question
-6. If the candidate seems stuck, offer helpful prompts or examples
-7. Keep responses concise but informative
-8. Extract key achievements with specific metrics when possible
-
-Interview Questions to Cover (in order):
+Ask these questions one at a time:
 ${INTERVIEW_QUESTIONS.map((q, i) => `${i + 1}. ${q}`).join('\n')}
 
-After gathering all information, summarize the key points and confirm you have everything needed to create a professional resume.`
+Keep responses brief and natural. Ask one question, wait for the answer, then move to the next.`
           }
         ]
       },
       voice: {
-        provider: "11labs",
-        voiceId: "21m00Tcm4TlvDq8ikWAM", // Rachel - Professional female voice
-        stability: 0.5,
-        similarityBoost: 0.8,
-        style: 0,
-        useSpeakerBoost: true
+        provider: "11labs" as const,
+        voiceId: "21m00Tcm4TlvDq8ikWAM" // Rachel voice
       },
-      transcriber: {
-        provider: "deepgram",
-        model: "nova-2",
-        language: "en",
-        smartFormat: true,
-        keywords: ["resume", "experience", "education", "skills", "achievement"]
-      },
-      firstMessage: "Hello! I'm your professional career coach, and I'm here to help you create an outstanding resume. We'll have a natural conversation about your background and experience. Feel free to interrupt me or ask questions at any time. Let's start with your name. How would you like to be addressed professionally?",
-      endCallMessage: "Thank you for sharing your professional background with me. I have all the information I need to create your resume. Have a great day!",
-      server: {
-        url: `${process.env.REPLIT_DOMAINS ? 'https://' + process.env.REPLIT_DOMAINS : 'http://localhost:5000'}/api/resume/vapi/webhook`
-      },
-      maxDurationSeconds: 1800, // 30 minutes max
-      backgroundSound: "office"
+      firstMessage: "Hello! I'm your career coach. Let's create your resume. First, what's your name?",
+      maxDurationSeconds: 600 // Start with 10 minutes for testing
+    };
+    
+    console.log('Assistant config:', JSON.stringify(assistantConfig, null, 2));
+    
+    const assistant = await vapi.assistants.create(assistantConfig);
+    
+    console.log('Assistant created successfully:', {
+      id: assistant.id,
+      name: assistant.name
     });
-
+    
     return assistant;
-  } catch (error) {
-    console.error('Error creating Vapi assistant:', error);
-    throw error;
+  } catch (error: any) {
+    console.error('Error creating Vapi assistant:', error.message || error);
+    console.error('Full error details:', error);
+    
+    // Try to parse error if it's a response object
+    if (error.response) {
+      console.error('Error response:', error.response.data || error.response);
+    }
+    
+    throw new Error(`Failed to create assistant: ${error.message || 'Unknown error'}`);
   }
 };
 
 // Start a new Vapi interview session
 export const startVapiInterview = async (userId: string, userName?: string) => {
+  console.log('startVapiInterview called for user:', userId, 'userName:', userName);
+  
   try {
+    // Check if Vapi API key is configured
+    if (!process.env.VAPI_API_KEY) {
+      throw new Error('VAPI_API_KEY environment variable is not configured');
+    }
+    
     // Create or get assistant
-    let assistantsList = await vapi.assistants.list();
+    console.log('Listing existing assistants...');
+    let assistantsList;
     let resumeAssistant: any = null;
     
-    // Handle different response structures
-    if (Array.isArray(assistantsList)) {
-      resumeAssistant = assistantsList.find(a => a.name === "Professional Resume Builder");
-    } else if ((assistantsList as any)?.items) {
-      resumeAssistant = (assistantsList as any).items.find((a: any) => a.name === "Professional Resume Builder");
-    } else if ((assistantsList as any)?.data) {
-      resumeAssistant = (assistantsList as any).data.find((a: any) => a.name === "Professional Resume Builder");
+    try {
+      assistantsList = await vapi.assistants.list();
+      console.log('Assistants list response type:', typeof assistantsList);
+      console.log('Assistants list keys:', assistantsList ? Object.keys(assistantsList) : 'null');
+      
+      // Handle different response structures
+      if (Array.isArray(assistantsList)) {
+        console.log('Response is array with', assistantsList.length, 'assistants');
+        resumeAssistant = assistantsList.find(a => a.name === "Professional Resume Builder");
+      } else if ((assistantsList as any)?.items) {
+        console.log('Response has items array with', (assistantsList as any).items.length, 'assistants');
+        resumeAssistant = (assistantsList as any).items.find((a: any) => a.name === "Professional Resume Builder");
+      } else if ((assistantsList as any)?.data) {
+        console.log('Response has data array with', (assistantsList as any).data.length, 'assistants');
+        resumeAssistant = (assistantsList as any).data.find((a: any) => a.name === "Professional Resume Builder");
+      } else {
+        console.log('Unknown assistants list structure:', assistantsList);
+      }
+    } catch (listError: any) {
+      console.error('Error listing assistants:', listError.message || listError);
+      // Continue - we'll create a new assistant
     }
     
     if (!resumeAssistant) {
+      console.log('No existing assistant found, creating new one...');
       resumeAssistant = await createResumeAssistant();
+    } else {
+      console.log('Found existing assistant:', resumeAssistant.id);
     }
 
-    // Create web call
-    const callResponse = await vapi.calls.create({
-      assistantId: resumeAssistant.id,
-      customer: {
-        name: userName || "User",
-        number: "+10000000000" // Placeholder number for web calls
-      },
-      phoneNumberId: undefined // Web call, no phone number needed
-    });
+    console.log('Assistant ready, ID:', resumeAssistant.id);
 
-    // Handle both single call response and batch response
-    const call = 'id' in callResponse ? callResponse : (callResponse as any).calls?.[0];
+    // For web SDK, we don't create a call server-side
+    // The client will use the assistant ID to start the call
+    console.log('Returning assistant info for web SDK...');
     
-    if (!call || !call.id) {
-      throw new Error('Failed to create call');
-    }
-
-    // Store call in database
-    await db.insert(vapiCalls).values({
+    // Store initial call record (will be updated via webhook)
+    const callRecord = {
       userId,
-      callId: call.id,
+      callId: `pending-${Date.now()}`, // Temporary ID until we get real call ID from webhook
       assistantId: resumeAssistant.id,
-      status: 'started',
+      status: 'pending',
       metadata: {
         userName,
         startedAt: new Date().toISOString()
       }
-    });
-
-    // Return the web call URL for the client
-    return {
-      success: true,
-      callId: call.id,
-      webCallUrl: `https://vapi.ai/call/${call.id}`,
-      assistantId: resumeAssistant.id
     };
-  } catch (error) {
-    console.error('Error starting Vapi interview:', error);
-    throw error;
+    
+    console.log('Inserting initial call record:', callRecord);
+    await db.insert(vapiCalls).values(callRecord);
+
+    // Return assistant info for the client to use
+    const response = {
+      success: true,
+      callId: callRecord.callId,
+      assistantId: resumeAssistant.id,
+      assistantName: resumeAssistant.name
+    };
+    
+    console.log('Returning response:', response);
+    return response;
+    
+  } catch (error: any) {
+    console.error('Error in startVapiInterview:', error.message || error);
+    console.error('Full error:', error);
+    
+    // Provide more specific error message
+    if (error.message?.includes('VAPI_API_KEY')) {
+      throw new Error('Vapi API key not configured. Please set VAPI_API_KEY environment variable.');
+    }
+    
+    throw new Error(`Failed to start interview: ${error.message || 'Unknown error'}`);
   }
 };
 

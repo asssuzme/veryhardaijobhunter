@@ -41,53 +41,34 @@ router.get('/api/resume/vapi/credits', requireAuth, async (req: any, res) => {
   }
 });
 
-// Start a new Vapi interview session
+// Start a new Vapi interview session (FREE - no payment required)
 router.post('/api/resume/vapi/start-interview', requireAuth, async (req: any, res) => {
   try {
     const userId = req.session.userId;
     const { userName } = req.body;
 
-    // Check if user can use Vapi
-    const credits = await checkVapiCredits(userId);
-    
-    if (credits.requiresPayment) {
-      // Create payment session for $2.99
-      if (!dodo) {
-        return res.status(503).json({ error: 'Payment service not configured. Please contact support.' });
-      }
-      
-      try {
-        const payment = await dodo.payment.createPaymentLink({
-          name: 'Pro Voice Interview Session',
-          description: 'Professional AI-powered resume interview with natural conversation',
-          currency: 'USD',
-          amount: 2.99,
-          quantity: 1,
-          redirect_url: `${process.env.REPLIT_DOMAINS ? 'https://' + process.env.REPLIT_DOMAINS : 'http://localhost:5000'}/payment-success?type=vapi`,
-          metadata: {
-            userId,
-            type: 'vapi_interview'
-          }
-        });
+    console.log('Starting Vapi interview for user:', userId, 'with name:', userName);
 
-        return res.json({
-          requiresPayment: true,
-          paymentUrl: payment.url,
-          message: 'Payment required for Pro Voice Interview'
-        });
-      } catch (paymentError) {
-        console.error('Error creating payment:', paymentError);
-        return res.status(500).json({ error: 'Failed to create payment session' });
-      }
-    }
-
-    // Start Vapi interview
+    // Start Vapi interview directly - no payment checks
     const result = await startVapiInterview(userId, userName);
     
-    res.json(result);
-  } catch (error) {
-    console.error('Error starting Vapi interview:', error);
-    res.status(500).json({ error: 'Failed to start interview' });
+    console.log('Vapi interview started successfully:', result);
+    
+    // Add the Vapi public key to the response
+    const response = {
+      ...result,
+      publicKey: process.env.VAPI_PUBLIC_KEY || '668f8fb5-3aac-45f9-ab43-591b20c985d4'
+    };
+    
+    res.json(response);
+  } catch (error: any) {
+    console.error('Error starting Vapi interview:', error.message || error);
+    console.error('Full error:', error);
+    res.status(500).json({ 
+      error: 'Failed to start interview',
+      details: error.message || 'Unknown error occurred',
+      success: false 
+    });
   }
 });
 

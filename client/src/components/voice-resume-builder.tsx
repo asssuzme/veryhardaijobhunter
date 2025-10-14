@@ -732,74 +732,113 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
     setMode('pro-interview');
     setVapiStatus('connecting');
     
+    console.log('Starting Pro Interview...');
+    
     try {
-      // First check if user has credits or needs to pay
-      const creditsResponse = await apiRequest('/api/resume/vapi/credits');
+      // Start Vapi interview directly without payment checks
+      const response = await apiRequest('/api/resume/vapi/start-interview', {
+        method: 'POST',
+        body: JSON.stringify({
+          userName: localStorage.getItem('userName') || 'User'
+        })
+      });
       
-      if (creditsResponse.requiresPayment) {
-        // Start Vapi interview (will redirect to payment if needed)
-        const response = await apiRequest('/api/resume/vapi/start-interview', {
-          method: 'POST',
-          body: JSON.stringify({
-            userName: localStorage.getItem('userName') || 'User'
-          })
-        });
-        
-        if (response.requiresPayment) {
-          // Redirect to payment
-          window.location.href = response.paymentUrl;
-          return;
-        }
-        
-        if (response.success && response.callId) {
-          setVapiCallId(response.callId);
-          
-          // Initialize Vapi client
-          const vapi = new Vapi(response.publicKey || process.env.VAPI_PUBLIC_KEY || '');
-          setVapiClient(vapi);
-          
-          // Start the web call
-          await vapi.start(response.assistantId);
-          
-          // Set up event listeners
-          vapi.on('call-start', () => {
-            setVapiStatus('connected');
-            toast({
-              title: "Pro Interview Started",
-              description: "You can now have a natural conversation with our AI coach"
-            });
-          });
-          
-          vapi.on('call-end', async () => {
-            setVapiStatus('ended');
-            // Fetch transcript and generate resume
-            await handleVapiCallEnd(response.callId);
-          });
-          
-          vapi.on('speech-start', () => {
-            // AI is speaking
-          });
-          
-          vapi.on('speech-end', () => {
-            // AI finished speaking
-          });
-          
-          vapi.on('volume-level', (level: number) => {
-            setVoiceLevel(level);
-          });
-          
-          vapi.on('error', (error: any) => {
-            console.error('Vapi error:', error);
-            setErrorMessage('An error occurred during the interview. Please try again.');
-            setVapiStatus('ended');
-          });
-        }
+      console.log('Vapi start response:', response);
+      
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to start interview');
       }
-    } catch (error) {
+      
+      if (!response.assistantId) {
+        throw new Error('No assistant ID received from server');
+      }
+      
+      setVapiCallId(response.callId);
+      console.log('Call ID:', response.callId);
+      console.log('Assistant ID:', response.assistantId);
+      
+      // Initialize Vapi client with proper configuration
+      const publicKey = response.publicKey || process.env.VAPI_PUBLIC_KEY || '668f8fb5-3aac-45f9-ab43-591b20c985d4';
+      console.log('Using public key:', publicKey);
+      
+      const vapi = new Vapi(publicKey);
+      setVapiClient(vapi);
+      
+      // Set up event listeners before starting
+      vapi.on('call-start', () => {
+        console.log('Vapi call started successfully');
+        setVapiStatus('connected');
+        setErrorMessage('');
+        toast({
+          title: "Pro Interview Started",
+          description: "You can now have a natural conversation with our AI coach"
+        });
+      });
+        
+      vapi.on('call-end', async () => {
+        console.log('Vapi call ended');
+        setVapiStatus('ended');
+        // Fetch transcript and generate resume
+        if (response.callId) {
+          await handleVapiCallEnd(response.callId);
+        }
+      });
+        
+      vapi.on('speech-start', () => {
+        console.log('AI is speaking...');
+      });
+        
+      vapi.on('speech-end', () => {
+        console.log('AI finished speaking');
+      });
+        
+      vapi.on('volume-level', (level: number) => {
+        setVoiceLevel(level);
+      });
+        
+      vapi.on('error', (error: any) => {
+        console.error('Vapi error event:', error);
+        setErrorMessage(`Connection error: ${error.message || 'Please check your microphone and try again'}`);
+        setVapiStatus('ended');
+        toast({
+          title: "Connection Error",
+          description: error.message || "Failed to connect to AI coach",
+          variant: "destructive"
+        });
+      });
+      
+      // Actually start the Vapi call - THIS WAS MISSING!
+      console.log('Starting Vapi call with assistant:', response.assistantId);
+      
+      // Add timeout for connection
+      const connectionTimeout = setTimeout(() => {
+        if (vapiStatus === 'connecting') {
+          console.error('Connection timeout - took too long to connect');
+          setErrorMessage('Connection timeout. Please check your network and try again.');
+          setVapiStatus('idle');
+          setMode('choice');
+          if (vapi) {
+            vapi.stop();
+          }
+        }
+      }, 30000); // 30 second timeout
+      
+      try {
+        await vapi.start(response.assistantId);
+        clearTimeout(connectionTimeout);
+        console.log('Vapi start() called successfully');
+      } catch (startError: any) {
+        clearTimeout(connectionTimeout);
+        console.error('Failed to start Vapi:', startError);
+        throw new Error(`Failed to start call: ${startError.message || 'Unknown error'}`);
+      }
+      
+    } catch (error: any) {
       console.error('Error starting Pro interview:', error);
+      setErrorMessage(error.message || 'Failed to start interview');
       toast({
         title: "Error",
-        description: "Failed to start Pro interview. Please try again.",
+        description: error.message || "Failed to start Pro interview. Please try again.",
         variant: "destructive"
       });
       setMode('choice');
@@ -1086,10 +1125,10 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
                       </ul>
                       <div className="w-full space-y-2 mt-4">
                         <Button className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-semibold">
-                          <CreditCard className="h-4 w-4 mr-2" />
-                          Start Pro Interview - $2.99
+                          <Phone className="h-4 w-4 mr-2" />
+                          Start Pro Interview
                         </Button>
-                        <p className="text-xs text-gray-500">One-time payment per session</p>
+                        <p className="text-xs text-gray-500">Natural AI conversation</p>
                       </div>
                     </div>
                   </Card>
