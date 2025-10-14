@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { useAuth } from "@/hooks/useAuth";
-import { Settings as SettingsIcon, User as UserIcon, Bell, Shield, Globe, Save, FileText, Upload, Mic, Eye, Download } from "lucide-react";
+import { Settings as SettingsIcon, User as UserIcon, Bell, Shield, Globe, Save, FileText, Upload, Mic, Eye, Download, Maximize2, Printer, ZoomIn, ZoomOut, RefreshCw, Calendar, FileType, AlertCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -16,6 +16,9 @@ import { VoiceResumeBuilder } from "@/components/voice-resume-builder";
 import { ResumeViewer } from "@/components/resume-viewer";
 import type { StructuredResume } from "@shared/types/resume";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export default function Settings() {
   const { user } = useAuth();
@@ -24,7 +27,15 @@ export default function Settings() {
   const [showVoiceResumeBuilder, setShowVoiceResumeBuilder] = useState(false);
   const [showResumeViewer, setShowResumeViewer] = useState(false);
   const [resumeTheme, setResumeTheme] = useState<'classic' | 'modern' | 'minimal'>('modern');
+  const [zoomLevel, setZoomLevel] = useState(100);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [resumeMetadata, setResumeMetadata] = useState<{
+    uploadedDate?: string;
+    fileType?: string;
+    lastModified?: string;
+  }>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const resumeViewerRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
   if (!user) return null;
@@ -33,11 +44,23 @@ export default function Settings() {
   const typedUser = user as User;
   
   // Fetch structured resume data
-  const { data: structuredResumeData } = useQuery({
+  const { data: structuredResumeData, isLoading: isLoadingResume, error: resumeError } = useQuery({
     queryKey: ['/api/resume/structured'],
     queryFn: () => apiRequest('/api/resume/structured'),
-    enabled: !!typedUser.resumeText
+    enabled: !!typedUser.resumeText,
+    retry: 2
   });
+
+  // Update metadata when resume changes
+  useEffect(() => {
+    if (typedUser.resumeText) {
+      setResumeMetadata({
+        uploadedDate: typedUser.resumeUploadedAt || new Date().toISOString(),
+        fileType: typedUser.resumeFileType || 'text/plain',
+        lastModified: typedUser.resumeUpdatedAt || new Date().toISOString()
+      });
+    }
+  }, [typedUser.resumeText]);
 
   const uploadResumeMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -151,6 +174,69 @@ export default function Settings() {
         variant: "destructive",
       });
     }
+  };
+
+  const handlePrint = () => {
+    if (!structuredResumeData?.structuredResume) return;
+    
+    const printWindow = window.open('', 'PRINT', 'height=800,width=600');
+    
+    if (printWindow) {
+      printWindow.document.write('<html><head><title>Resume Print</title>');
+      printWindow.document.write(`
+        <style>
+          @media print {
+            body { margin: 0; padding: 10mm; font-family: system-ui, -apple-system, sans-serif; }
+            .no-print { display: none !important; }
+            @page { margin: 10mm; }
+          }
+          body { font-size: 14px; line-height: 1.6; color: #000; }
+          h1 { font-size: 24px; margin: 0 0 10px; }
+          h2 { font-size: 18px; margin: 20px 0 10px; border-bottom: 2px solid #333; padding-bottom: 5px; }
+          h3 { font-size: 16px; margin: 10px 0 5px; }
+          .header { margin-bottom: 20px; }
+          .contact { display: flex; flex-wrap: wrap; gap: 15px; font-size: 12px; margin-top: 10px; }
+          .section { margin-bottom: 20px; }
+          .experience-item, .education-item { margin-bottom: 15px; }
+          .skills { display: flex; flex-wrap: wrap; gap: 8px; }
+          .skill-tag { background: #f0f0f0; padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+        </style>
+      `);
+      printWindow.document.write('</head><body>');
+      
+      // Get the resume content from the ResumeViewer component
+      const resumeContent = resumeViewerRef.current?.innerHTML || '';
+      printWindow.document.write(resumeContent);
+      
+      printWindow.document.write('</body></html>');
+      printWindow.document.close();
+      printWindow.focus();
+      
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+        toast({
+          title: "Print dialog opened",
+          description: "Your resume is ready to print",
+        });
+      }, 250);
+    }
+  };
+
+  const handleZoomChange = (newZoom: number) => {
+    setZoomLevel(newZoom);
+    toast({
+      title: `Zoom: ${newZoom}%`,
+      description: "Resume zoom level updated",
+    });
+  };
+
+  const handleFullscreen = () => {
+    setIsFullscreen(true);
+  };
+
+  const handleRetryUpload = () => {
+    fileInputRef.current?.click();
   };
 
   const handleSave = () => {
@@ -277,45 +363,228 @@ export default function Settings() {
               </TabsList>
               
               <TabsContent value="view" className="space-y-4">
-                {structuredResumeData?.structuredResume ? (
+                {/* Resume Metadata */}
+                {resumeMetadata.uploadedDate && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex flex-wrap gap-4 text-sm text-muted-foreground p-3 bg-muted/30 rounded-lg"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      <span>Uploaded: {new Date(resumeMetadata.uploadedDate).toLocaleDateString()}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <FileType className="h-4 w-4" />
+                      <span>Type: {resumeMetadata.fileType?.split('/')[1]?.toUpperCase() || 'TEXT'}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <RefreshCw className="h-4 w-4" />
+                      <span>Modified: {new Date(resumeMetadata.lastModified || '').toLocaleDateString()}</span>
+                    </div>
+                  </motion.div>
+                )}
+
+                {isLoadingResume ? (
+                  <div className="space-y-4 p-4">
+                    <Skeleton className="h-8 w-3/4" />
+                    <Skeleton className="h-32 w-full" />
+                    <Skeleton className="h-24 w-full" />
+                    <Skeleton className="h-24 w-full" />
+                  </div>
+                ) : resumeError ? (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="p-8 text-center"
+                  >
+                    <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">Error Loading Resume</h3>
+                    <p className="text-muted-foreground mb-4">
+                      We encountered an error while processing your resume. Please try again.
+                    </p>
+                    <div className="flex gap-2 justify-center">
+                      <Button onClick={handleRetryUpload} variant="outline">
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Retry Upload
+                      </Button>
+                      <Button onClick={() => queryClient.invalidateQueries({ queryKey: ['/api/resume/structured'] })}>
+                        Refresh
+                      </Button>
+                    </div>
+                  </motion.div>
+                ) : structuredResumeData?.structuredResume ? (
                   <>
-                    {/* Theme Selector */}
-                    <div className="flex items-center justify-between gap-4 p-3 bg-muted/50 rounded-lg">
-                      <div className="flex items-center gap-2">
-                        <Label>Resume Style:</Label>
+                    {/* Controls Bar */}
+                    <div className="flex flex-col sm:flex-row justify-between gap-4 p-4 bg-muted/50 rounded-lg">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Label className="text-sm">Theme:</Label>
                         <select
                           value={resumeTheme}
                           onChange={(e) => setResumeTheme(e.target.value as any)}
-                          className="px-3 py-1 rounded-md border bg-background"
+                          className="px-3 py-1.5 rounded-md border bg-background text-sm"
                         >
-                          <option value="modern">Modern</option>
-                          <option value="classic">Classic</option>
-                          <option value="minimal">Minimal</option>
+                          <option value="modern">✨ Modern</option>
+                          <option value="classic">📜 Classic</option>
+                          <option value="minimal">⚡ Minimal</option>
                         </select>
+                        
+                        <div className="flex items-center gap-1 ml-2">
+                          <Label className="text-sm">Zoom:</Label>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => handleZoomChange(Math.max(50, zoomLevel - 25))}
+                                  disabled={zoomLevel <= 50}
+                                >
+                                  <ZoomOut className="h-3 w-3" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Zoom Out</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          
+                          <select
+                            value={zoomLevel}
+                            onChange={(e) => handleZoomChange(Number(e.target.value))}
+                            className="px-2 py-1 mx-1 rounded-md border bg-background text-sm w-20"
+                          >
+                            <option value="50">50%</option>
+                            <option value="75">75%</option>
+                            <option value="100">100%</option>
+                            <option value="125">125%</option>
+                            <option value="150">150%</option>
+                            <option value="200">200%</option>
+                          </select>
+                          
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => handleZoomChange(Math.min(200, zoomLevel + 25))}
+                                  disabled={zoomLevel >= 200}
+                                >
+                                  <ZoomIn className="h-3 w-3" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Zoom In</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
                       </div>
-                      <Button
-                        onClick={handleDownloadPDF}
-                        variant="default"
-                        size="sm"
-                      >
-                        <Download className="h-4 w-4 mr-2" />
-                        Download PDF
-                      </Button>
+                      
+                      <div className="flex gap-2">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                onClick={handleFullscreen}
+                                variant="outline"
+                                size="sm"
+                              >
+                                <Maximize2 className="h-4 w-4 sm:mr-2" />
+                                <span className="hidden sm:inline">Full Screen</span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>View in full screen</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                onClick={handlePrint}
+                                variant="outline"
+                                size="sm"
+                              >
+                                <Printer className="h-4 w-4 sm:mr-2" />
+                                <span className="hidden sm:inline">Print</span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Print resume</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                onClick={handleDownloadPDF}
+                                variant="default"
+                                size="sm"
+                              >
+                                <Download className="h-4 w-4 sm:mr-2" />
+                                <span className="hidden sm:inline">Download PDF</span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Download as PDF</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
                     </div>
                     
-                    {/* Resume Viewer */}
-                    <div className="border rounded-lg overflow-hidden">
-                      <ResumeViewer
-                        resume={structuredResumeData.structuredResume}
-                        theme={resumeTheme}
-                        className="scale-90 origin-top"
-                      />
+                    {/* Resume Viewer with responsive zoom */}
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.3 }}
+                      className="border rounded-lg overflow-auto bg-white"
+                      style={{
+                        maxHeight: '80vh',
+                      }}
+                    >
+                      <div
+                        ref={resumeViewerRef}
+                        className="transition-transform duration-300 origin-top-left"
+                        style={{
+                          transform: `scale(${zoomLevel / 100})`,
+                          width: `${100 / (zoomLevel / 100)}%`,
+                        }}
+                      >
+                        <ResumeViewer
+                          resume={structuredResumeData.structuredResume}
+                          theme={resumeTheme}
+                          className="w-full"
+                        />
+                      </div>
+                    </motion.div>
+                    
+                    {/* Re-upload button in View tab */}
+                    <div className="flex justify-center pt-4">
+                      <Button
+                        variant="outline"
+                        onClick={handleRetryUpload}
+                        className="group"
+                      >
+                        <Upload className="h-4 w-4 mr-2 group-hover:animate-bounce" />
+                        Re-upload Resume
+                      </Button>
                     </div>
                   </>
                 ) : (
-                  <div className="p-8 text-center text-muted-foreground">
-                    <p>Loading resume preview...</p>
-                  </div>
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="p-8 text-center"
+                  >
+                    <FileText className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No Resume Data Available</h3>
+                    <p className="text-muted-foreground mb-4">
+                      We couldn't process your resume. Please try uploading again.
+                    </p>
+                    <Button onClick={handleRetryUpload}>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload Resume
+                    </Button>
+                  </motion.div>
                 )}
               </TabsContent>
               
@@ -505,6 +774,75 @@ export default function Settings() {
         }}
         onResumeGenerated={handleVoiceResumeGenerated}
       />
+
+      {/* Fullscreen Resume Dialog */}
+      <Dialog open={isFullscreen} onOpenChange={setIsFullscreen}>
+        <DialogContent className="max-w-[95vw] w-full h-[95vh] p-0">
+          <DialogHeader className="p-4 border-b">
+            <DialogTitle className="flex items-center justify-between">
+              <span>Resume Preview</span>
+              <div className="flex items-center gap-4">
+                <select
+                  value={resumeTheme}
+                  onChange={(e) => setResumeTheme(e.target.value as any)}
+                  className="px-3 py-1.5 rounded-md border bg-background text-sm"
+                >
+                  <option value="modern">✨ Modern</option>
+                  <option value="classic">📜 Classic</option>
+                  <option value="minimal">⚡ Minimal</option>
+                </select>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => handleZoomChange(Math.max(50, zoomLevel - 25))}
+                    disabled={zoomLevel <= 50}
+                  >
+                    <ZoomOut className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm font-medium w-12 text-center">{zoomLevel}%</span>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => handleZoomChange(Math.min(200, zoomLevel + 25))}
+                    disabled={zoomLevel >= 200}
+                  >
+                    <ZoomIn className="h-4 w-4" />
+                  </Button>
+                </div>
+                <Button onClick={handlePrint} variant="outline" size="sm">
+                  <Printer className="h-4 w-4 mr-2" />
+                  Print
+                </Button>
+                <Button onClick={handleDownloadPDF} variant="default" size="sm">
+                  <Download className="h-4 w-4 mr-2" />
+                  Download
+                </Button>
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="overflow-auto p-4 bg-gray-50" style={{ height: 'calc(100% - 73px)' }}>
+            {structuredResumeData?.structuredResume && (
+              <div
+                className="transition-transform duration-300 origin-top-left mx-auto"
+                style={{
+                  transform: `scale(${zoomLevel / 100})`,
+                  width: `${100 / (zoomLevel / 100)}%`,
+                  maxWidth: '1200px',
+                }}
+              >
+                <ResumeViewer
+                  resume={structuredResumeData.structuredResume}
+                  theme={resumeTheme}
+                  className="w-full shadow-xl"
+                />
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

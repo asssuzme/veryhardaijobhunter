@@ -58,6 +58,102 @@
   transform-style: preserve-3d;
 }
 
+/* Resume Viewer Enhancements */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  .print\\:bg-white {
+    background: white !important;
+  }
+  
+  .print\\:shadow-none {
+    box-shadow: none !important;
+  }
+  
+  .print\\:p-0 {
+    padding: 0 !important;
+  }
+}
+
+/* Smooth animations for resume sections */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.5s ease-out forwards;
+}
+
+/* Enhanced shadow effects */
+.shadow-3xl {
+  box-shadow: 0 35px 60px -15px rgba(0, 0, 0, 0.3);
+}
+
+/* Resume responsive typography */
+@media (max-width: 640px) {
+  .resume-viewer h1 {
+    font-size: 1.875rem !important;
+  }
+  
+  .resume-viewer h2 {
+    font-size: 1.25rem !important;
+  }
+  
+  .resume-viewer h3 {
+    font-size: 1rem !important;
+  }
+  
+  .resume-viewer .text-sm {
+    font-size: 0.875rem !important;
+  }
+  
+  .resume-viewer .text-base {
+    font-size: 0.938rem !important;
+  }
+}
+
+/* Touch-friendly controls for mobile */
+@media (max-width: 768px) {
+  .resume-controls button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  .resume-controls select {
+    min-height: 44px;
+    padding: 8px 12px;
+  }
+}
+
+/* Improved scrollbar styling */
+.resume-viewer-container::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.resume-viewer-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.resume-viewer-container::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 10px;
+}
+
+.resume-viewer-container::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
 .dark {
   /* Dark mode - Deep navy with gold accents */
   --background: hsl(224, 71%, 4%);
