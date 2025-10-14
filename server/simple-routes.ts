@@ -2399,21 +2399,35 @@ Best,
     }
   });
 
-  // Parse plain text resume to structured format
+  // Parse plain text resume to structured format (AI-powered)
   app.post("/api/resume/parse", requireAuth, async (req, res) => {
     try {
       const { resumeText } = req.body;
       
       if (!resumeText) {
-        return res.status(400).json({ error: 'Resume text is required' });
+        // Try to load from user's stored resume
+        const userResume = await storage.getUserResume(req.user!.id);
+        if (!userResume?.resumeText) {
+          return res.status(400).json({ error: 'No resume text provided or found' });
+        }
+        // Use stored resume text
+        const { parseResumeText } = await import('./utils/resume-parser');
+        const structuredResume = await parseResumeText(userResume.resumeText);
+        
+        return res.json({ 
+          success: true,
+          structuredResume,
+          source: 'stored' 
+        });
       }
       
       const { parseResumeText } = await import('./utils/resume-parser');
-      const structuredResume = parseResumeText(resumeText);
+      const structuredResume = await parseResumeText(resumeText);
       
       res.json({ 
         success: true,
-        structuredResume 
+        structuredResume,
+        source: 'provided'
       });
     } catch (error) {
       console.error('Resume parsing error:', error);
@@ -2424,13 +2438,24 @@ Best,
     }
   });
 
-  // Generate PDF from structured resume
+  // Generate PDF from structured resume (loads from DB if not provided)
   app.post("/api/resume/generate-pdf", requireAuth, async (req, res) => {
     try {
-      const { structuredResume, theme = 'modern' } = req.body;
+      let { structuredResume, theme = 'modern' } = req.body;
       
+      // If no structured resume provided, load from database
       if (!structuredResume) {
-        return res.status(400).json({ error: 'Structured resume data is required' });
+        console.log('[PDF-EXPORT] Loading resume from database for user:', req.user!.id);
+        const userResume = await storage.getUserResume(req.user!.id);
+        
+        if (!userResume?.resumeText) {
+          return res.status(404).json({ error: 'No resume found. Please upload a resume first.' });
+        }
+        
+        // Parse the stored resume text using AI
+        const { parseResumeText } = await import('./utils/resume-parser');
+        structuredResume = await parseResumeText(userResume.resumeText);
+        console.log('[PDF-EXPORT] Parsed resume from database with AI');
       }
       
       const { generateResumePDF } = await import('./utils/resume-pdf-generator');
@@ -2453,7 +2478,7 @@ Best,
     }
   });
 
-  // Get user's resume as structured data and PDF
+  // Get user's resume as structured data (AI-parsed)
   app.get("/api/resume/structured", requireAuth, async (req, res) => {
     try {
       const userResume = await storage.getUserResume(req.user!.id);
@@ -2463,7 +2488,7 @@ Best,
       }
       
       const { parseResumeText } = await import('./utils/resume-parser');
-      const structuredResume = parseResumeText(userResume.resumeText);
+      const structuredResume = await parseResumeText(userResume.resumeText);
       
       res.json({
         success: true,
@@ -2480,17 +2505,20 @@ Best,
     }
   });
 
-  // Export resume as JSON
+  // Export resume as JSON (AI-parsed from database)
   app.get("/api/resume/export/json", requireAuth, async (req, res) => {
     try {
+      console.log('[JSON-EXPORT] Loading resume from database for user:', req.user!.id);
       const userResume = await storage.getUserResume(req.user!.id);
       
       if (!userResume?.resumeText) {
-        return res.status(404).json({ error: 'No resume found' });
+        return res.status(404).json({ error: 'No resume found. Please upload a resume first.' });
       }
       
+      // Parse using AI
       const { parseResumeText } = await import('./utils/resume-parser');
-      const structuredResume = parseResumeText(userResume.resumeText);
+      const structuredResume = await parseResumeText(userResume.resumeText);
+      console.log('[JSON-EXPORT] Parsed resume from database with AI');
       
       res.setHeader('Content-Type', 'application/json');
       res.setHeader('Content-Disposition', 'attachment; filename="resume.json"');
@@ -2505,18 +2533,21 @@ Best,
     }
   });
   
-  // Export resume as DOCX
+  // Export resume as DOCX (AI-parsed from database)
   app.get("/api/resume/export/docx", requireAuth, async (req, res) => {
     try {
       const { theme = 'modern' } = req.query;
+      console.log('[DOCX-EXPORT] Loading resume from database for user:', req.user!.id);
       const userResume = await storage.getUserResume(req.user!.id);
       
       if (!userResume?.resumeText) {
-        return res.status(404).json({ error: 'No resume found' });
+        return res.status(404).json({ error: 'No resume found. Please upload a resume first.' });
       }
       
+      // Parse using AI
       const { parseResumeText } = await import('./utils/resume-parser');
-      const structuredResume = parseResumeText(userResume.resumeText);
+      const structuredResume = await parseResumeText(userResume.resumeText);
+      console.log('[DOCX-EXPORT] Parsed resume from database with AI');
       
       const { generateResumeDocx } = await import('./utils/resume-docx-generator');
       const docxBuffer = await generateResumeDocx(structuredResume, theme as any);
@@ -2534,7 +2565,7 @@ Best,
     }
   });
   
-  // Get resume analytics and metadata
+  // Get resume analytics and metadata (AI-parsed)
   app.get("/api/resume/analytics", requireAuth, async (req, res) => {
     try {
       const userResume = await storage.getUserResume(req.user!.id);
@@ -2543,8 +2574,10 @@ Best,
         return res.status(404).json({ error: 'No resume found' });
       }
       
+      // Parse using AI for accurate analytics
       const { parseResumeText } = await import('./utils/resume-parser');
-      const structuredResume = parseResumeText(userResume.resumeText);
+      const structuredResume = await parseResumeText(userResume.resumeText);
+      console.log('[ANALYTICS] Parsed resume with AI for analytics');
       
       const { calculateATSScore, getWordCount, getSectionsCompleted } = await import('./utils/resume-docx-generator');
       

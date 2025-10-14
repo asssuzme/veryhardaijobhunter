@@ -1,0 +1,78 @@
+
+John Doe
+johndoe@example.com
+(555) 123-4567
+San Francisco, CA
+linkedin.com/in/johndoe
+github.com/johndoe
+
+Professional Summary
+Senior Software Engineer with 8+ years of experience in full-stack development, specializing in Node.js, React, and cloud technologies. Proven track record of leading teams and delivering scalable applications that serve millions of users.
+
+Work Experience
+
+Senior Software Engineer
+TechCorp Inc, San Francisco, CA
+January 2020 - Present
+• Led a team of 5 engineers to redesign the core platform, resulting in 40% performance improvement
+• Architected and implemented microservices using Node.js and Docker, handling 10M+ requests daily
+• Mentored junior developers and conducted code reviews to maintain high code quality
+• Reduced infrastructure costs by 30% through optimization and efficient resource management
+
+Software Engineer
+StartupXYZ, San Francisco, CA
+June 2017 - December 2019
+• Developed RESTful APIs and React-based frontend for e-commerce platform
+• Implemented CI/CD pipeline using GitHub Actions and AWS CodeDeploy
+• Improved database query performance by 60% through indexing and query optimization
+• Collaborated with product team to define technical requirements and deliver features on time
+
+Junior Developer
+WebSolutions Ltd, San Jose, CA
+July 2015 - May 2017
+• Built responsive web applications using HTML5, CSS3, and JavaScript
+• Participated in agile development process with daily standups and sprint planning
+• Fixed bugs and implemented feature enhancements based on customer feedback
+• Wrote unit tests achieving 85% code coverage
+
+Education
+
+Bachelor of Science in Computer Science
+Stanford University, Stanford, CA
+September 2011 - May 2015
+GPA: 3.8/4.0
+Relevant Coursework: Data Structures, Algorithms, Database Systems, Software Engineering
+
+Skills
+
+Programming Languages: JavaScript, TypeScript, Python, Java, Go
+Frameworks & Libraries: React, Node.js, Express.js, Next.js, Django, Spring Boot
+Databases: PostgreSQL, MongoDB, Redis, MySQL, Elasticsearch
+Cloud & DevOps: AWS, Docker, Kubernetes, CI/CD, Terraform, GitHub Actions
+Tools & Software: Git, VS Code, Jira, Postman, DataDog
+
+Projects
+
+Open Source Contribution - React Component Library
+• Developed and maintained a popular React component library with 5K+ GitHub stars
+• Implemented accessibility features following WCAG 2.1 guidelines
+• Created comprehensive documentation and examples
+
+Personal Portfolio Website
+• Built a responsive portfolio using Next.js and Tailwind CSS
+• Integrated with Contentful CMS for dynamic content management
+• Deployed on Vercel with automatic deployments from GitHub
+
+Certifications
+
+AWS Certified Solutions Architect - Associate
+Amazon Web Services, March 2021
+
+Node.js Certified Developer
+OpenJS Foundation, January 2020
+
+Achievements
+
+• Employee of the Year 2021 at TechCorp Inc
+• Speaker at NodeConf 2022 - "Scaling Node.js Applications"
+• Published technical articles with 50K+ combined views on dev.to

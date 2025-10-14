@@ -1,6 +1,25 @@
 import { StructuredResume } from '../../shared/types/resume';
+import { parseResumeWithAI, parseResumeTextFallback } from './ai-resume-parser';
 
-export function parseResumeText(resumeText: string): StructuredResume {
+// Main export function that uses AI when available, fallback otherwise
+export async function parseResumeText(resumeText: string): Promise<StructuredResume> {
+  try {
+    // Try AI parsing first if available
+    if (process.env.OPENAI_API_KEY) {
+      console.log('[RESUME-PARSER] Using AI parser for resume');
+      return await parseResumeWithAI(resumeText);
+    }
+  } catch (error) {
+    console.error('[RESUME-PARSER] AI parsing failed, using fallback:', error);
+  }
+  
+  // Fallback to enhanced rule-based parser
+  console.log('[RESUME-PARSER] Using fallback parser for resume');
+  return parseResumeTextFallback(resumeText);
+}
+
+// Synchronous version for backward compatibility (uses basic parser)
+export function parseResumeTextSync(resumeText: string): StructuredResume {
   const lines = resumeText.split('\n').map(line => line.trim());
   const resume: StructuredResume = {
     personalInfo: {
