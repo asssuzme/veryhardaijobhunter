@@ -8,20 +8,22 @@ const vapi = new VapiClient({
   token: process.env.VAPI_API_KEY || '4be7cd46-4c1e-45c8-b919-7cbabf4da23d'
 });
 
-// Interview questions for the assistant
+// Enhanced interview questions for the assistant
 const INTERVIEW_QUESTIONS = [
   "Let's start with your name. How would you like to be addressed professionally?",
-  "What's the best email and phone number to reach you at?",
-  "What city and state are you located in?",
-  "Tell me about yourself in 2-3 sentences. What makes you unique as a professional?",
-  "What's your most recent job title and company? Tell me about your role there.",
-  "What were your main responsibilities in that position?",
-  "What professional achievements are you most proud of? Try to include specific numbers or results if you can.",
-  "What's your educational background? Include your degree, school, and graduation year if relevant.",
-  "Do you have any certifications or special training?",
-  "What are your top technical skills and tools you're proficient with?",
-  "Any soft skills or languages you'd like to highlight?",
-  "Finally, what type of role are you looking for? What's your ideal next position?"
+  "What's the best email and phone number to reach you at? Also, do you have a LinkedIn profile or professional website to include?",
+  "What city and state are you located in? Are you open to relocation or remote work?",
+  "Describe yourself as a professional in 3-4 sentences. What's your biggest strength and what value do you bring to employers?",
+  "What's your most recent or current job title and company? How long have you been in this role?",
+  "Walk me through your key responsibilities and the size of your team or budget if applicable.",
+  "What are your top 3-5 professional achievements? Please be specific with numbers - like percentages improved, money saved, team sizes, or projects delivered.",
+  "Tell me about your previous work experience before your current role. Include company names, titles, and major accomplishments.",
+  "What's your educational background? Include your degree, major, university, and graduation year.",
+  "Do you have any certifications, professional licenses, or specialized training?",
+  "What are your technical skills? Include programming languages, software, tools, frameworks, and platforms you're proficient with.",
+  "What are your key soft skills and professional competencies? Also, any languages you speak?",
+  "Tell me about any notable projects you've led or contributed to. What was the outcome?",
+  "What type of role are you targeting? What's your ideal position, industry, and company size?"
 ];
 
 // Create assistant configuration
@@ -39,12 +41,26 @@ export const createResumeAssistant = async () => {
         messages: [
           {
             role: "system" as const,
-            content: `You are a professional career coach conducting a resume interview. Be warm and professional.
+            content: `You are an elite career coach with 20 years of experience helping professionals craft compelling resumes. Your goal is to extract detailed, quantified achievements and specific accomplishments that will make their resume stand out.
 
-Ask these questions one at a time:
+INTERVIEW APPROACH:
+- Be warm, encouraging, and professional
+- Probe for specific numbers, metrics, and results
+- Ask follow-up questions when answers are vague
+- Encourage the candidate to quantify their achievements
+- Help them remember important details they might forget
+
+Ask these questions one at a time, and feel free to ask follow-ups:
 ${INTERVIEW_QUESTIONS.map((q, i) => `${i + 1}. ${q}`).join('\n')}
 
-Keep responses brief and natural. Ask one question, wait for the answer, then move to the next.`
+PROBING TECHNIQUES:
+- If they mention a project, ask: "What was the impact? Any metrics?"
+- If they mention a team, ask: "How many people? What was your role?"
+- If they mention improvement, ask: "By how much? What was the before/after?"
+- If they mention saving money/time, ask: "Can you estimate how much?"
+- If they mention leadership, ask: "What specific results did you achieve?"
+
+Remember: The more specific details we gather, the stronger their resume will be. Help them shine!`
           }
         ]
       },
@@ -326,44 +342,110 @@ export const generateResumeFromTranscript = async (callId: string, userId: strin
       messages: [
         {
           role: "system",
-          content: `You are a professional resume writer. Extract information from the interview transcript and create a well-formatted resume.
+          content: `You are an elite professional resume writer with 15+ years of experience. Extract information from the interview transcript and create a powerful, ATS-optimized resume.
 
-Format the resume with the following sections:
-1. Name and Contact Information
-2. Professional Summary (2-3 sentences)
-3. Work Experience (with bullet points for achievements)
-4. Education
-5. Skills
-6. Additional Information (if relevant)
+FORMAT THE RESUME EXACTLY AS FOLLOWS:
 
-Use professional language and action verbs. Include specific metrics and achievements when mentioned.`
+**[Full Name]**
+[Email] | [Phone] | [City, State] | [LinkedIn URL if provided] | [Website if provided]
+
+---
+
+**PROFESSIONAL SUMMARY**
+[3-4 powerful sentences capturing their expertise, unique value, and career objectives. Make it compelling!]
+
+**PROFESSIONAL EXPERIENCE**
+
+**[Job Title] | [Company Name]**
+[City, State] | [MM/YYYY] - [MM/YYYY or Present]
+• [Quantified achievement with strong action verb and specific metrics]
+• [Another measurable accomplishment showing impact]
+• [Leadership or collaboration achievement with team size/scope]
+• [Process improvement or innovation with results]
+• [Additional significant contribution]
+[Include 4-6 bullets per role, all starting with powerful action verbs]
+
+**EDUCATION**
+
+**[Degree] in [Major]**
+[University] | [City, State] | [MM/YYYY]
+• GPA: [if mentioned and 3.5+]
+• Relevant Coursework: [if mentioned]
+• Achievements: [honors, awards if mentioned]
+
+**CERTIFICATIONS & TRAINING**
+• [Certification Name] | [Issuer] | [Date]
+[List all mentioned certifications]
+
+**TECHNICAL SKILLS**
+• Programming: [Languages with proficiency levels]
+• Frameworks: [All mentioned frameworks]
+• Tools & Platforms: [Development tools, cloud platforms]
+• Databases: [Database technologies]
+
+**PROFESSIONAL COMPETENCIES**
+• Leadership: [Specific leadership skills demonstrated]
+• Communication: [Communication strengths]
+• Other: [Problem-solving, analytical skills, etc.]
+
+**NOTABLE PROJECTS** (if mentioned)
+**[Project Name]**
+• Technologies: [Tech stack]
+• Impact: [Business value and results]
+
+ACTION VERBS TO USE:
+Spearheaded, Orchestrated, Championed, Pioneered, Transformed, Optimized, 
+Streamlined, Enhanced, Accelerated, Delivered, Architected, Innovated
+
+CRITICAL RULES:
+- Extract EVERY specific number, percentage, or metric mentioned
+- Use the strongest action verbs possible
+- Ensure dates are in MM/YYYY format
+- Make every bullet point show measurable impact
+- If numbers aren't exact in transcript, use ranges (e.g., "10-15 team members")
+- NO generic phrases like "responsible for" or "helped with"`
         },
         {
           role: "user",
-          content: `Create a professional resume from this interview transcript:\n\n${callRecord.transcript}`
+          content: `Create a professional resume from this interview transcript. Extract ALL details, metrics, and accomplishments:\n\n${callRecord.transcript}`
         }
       ],
       temperature: 0.3,
-      max_tokens: 2000
+      max_tokens: 3000
     });
 
-    const resumeText = completion.choices[0].message.content;
+    let resumeText = completion.choices[0].message.content || '';
 
-    // Update call record with generated resume
+    // Import enhancement utilities and post-process the resume
+    const { enhanceResumeText, validateResume } = await import('../utils/resume-enhancer');
+    
+    // Enhance the generated resume
+    resumeText = enhanceResumeText(resumeText);
+    
+    // Validate the resume quality
+    const validation = validateResume(resumeText);
+    if (!validation.isValid) {
+      console.log('[VAPI-RESUME] Quality issues detected:', validation.issues);
+      // Continue anyway, but log the issues for monitoring
+    }
+
+    // Update call record with enhanced resume
     await db
       .update(vapiCalls)
       .set({
         generatedResume: resumeText,
         metadata: {
           ...(callRecord.metadata || {}),
-          resumeGeneratedAt: new Date().toISOString()
+          resumeGeneratedAt: new Date().toISOString(),
+          qualityValidation: validation
         }
       })
       .where(eq(vapiCalls.callId, callId));
 
     return {
       success: true,
-      resume: resumeText
+      resume: resumeText,
+      qualityValidation: validation
     };
   } catch (error) {
     console.error('Error generating resume from transcript:', error);

@@ -106,32 +106,82 @@ router.post('/api/resume/vapi/generate', requireAuth, async (req: any, res) => {
         messages: [
           {
             role: "system",
-            content: `You are a professional resume writer. Extract information from the interview transcript and create a well-formatted resume.
+            content: `You are an elite professional resume writer with 15+ years of experience. Extract information from the interview transcript and create a powerful, ATS-optimized resume.
 
-Format the resume with the following sections:
-1. Name and Contact Information
-2. Professional Summary (2-3 sentences)
-3. Work Experience (with bullet points for achievements)
-4. Education
-5. Skills
-6. Additional Information (if relevant)
+FORMAT THE RESUME EXACTLY AS FOLLOWS:
 
-Use professional language and action verbs. Include specific metrics and achievements when mentioned.`
+**[Full Name]**
+[Email] | [Phone] | [City, State] | [LinkedIn URL if provided]
+
+---
+
+**PROFESSIONAL SUMMARY**
+[3-4 powerful sentences capturing their expertise, unique value, and career objectives. Make it compelling!]
+
+**PROFESSIONAL EXPERIENCE**
+
+**[Job Title] | [Company Name]**
+[City, State] | [MM/YYYY] - [MM/YYYY or Present]
+• [Quantified achievement with strong action verb and specific metrics]
+• [Another measurable accomplishment showing impact]
+• [Leadership or collaboration achievement]
+• [Process improvement or innovation]
+• [Additional significant contributions]
+
+**EDUCATION**
+
+**[Degree] in [Major]**
+[University] | [City, State] | [MM/YYYY]
+• GPA: [if mentioned and 3.5+]
+• Relevant Coursework: [if mentioned]
+
+**CERTIFICATIONS & TRAINING**
+• [Certification Name] | [Issuer] | [Date]
+
+**TECHNICAL SKILLS**
+• Programming: [Languages with proficiency]
+• Frameworks: [All mentioned]
+• Tools & Platforms: [Tools, cloud platforms]
+
+**PROFESSIONAL COMPETENCIES**
+• Leadership: [Specific skills]
+• Communication: [Strengths]
+• Other: [Problem-solving, analytical, etc.]
+
+CRITICAL RULES:
+- Use STRONG ACTION VERBS (Spearheaded, Orchestrated, Optimized, etc.)
+- Include ALL metrics and numbers mentioned
+- Format dates as MM/YYYY
+- Make every bullet show measurable impact
+- NO generic phrases like "responsible for"`
           },
           {
             role: "user",
-            content: `Create a professional resume from this interview transcript:\n\n${transcript}`
+            content: `Create a professional resume from this interview transcript. Extract ALL details and metrics:\n\n${transcript}`
           }
         ],
         temperature: 0.3,
-        max_tokens: 2000
+        max_tokens: 3000
       });
 
-      const resumeText = completion.choices[0].message.content;
+      let resumeText = completion.choices[0].message.content || '';
+      
+      // Import enhancement utilities and post-process
+      const { enhanceResumeText, validateResume } = await import('../utils/resume-enhancer');
+      
+      // Enhance the generated resume
+      resumeText = enhanceResumeText(resumeText);
+      
+      // Validate the resume quality
+      const validation = validateResume(resumeText);
+      if (!validation.isValid) {
+        console.log('[VAPI-ROUTE] Quality issues detected:', validation.issues);
+      }
       
       result = {
         success: true,
-        resume: resumeText
+        resume: resumeText,
+        qualityValidation: validation
       };
     } else if (callId) {
       // Fallback to fetching transcript from database

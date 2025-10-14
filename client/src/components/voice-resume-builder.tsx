@@ -79,67 +79,91 @@ const INTERVIEW_QUESTIONS = [
   },
   {
     id: 'contact',
-    question: "What's the best email and phone number to reach you at?",
+    question: "What's the best email and phone number to reach you at? Also, do you have a LinkedIn profile or professional website to include?",
     category: 'personal',
     shortTitle: 'Contact',
+    followUp: null,
+    maxDuration: 20000
+  },
+  {
+    id: 'location',
+    question: "What city and state are you located in? Are you open to relocation or remote work?",
+    category: 'personal',
+    shortTitle: 'Location',
     followUp: null,
     maxDuration: 15000
   },
   {
-    id: 'location',
-    question: "What city and state are you located in?",
-    category: 'personal',
-    shortTitle: 'Location',
-    followUp: null,
-    maxDuration: 10000
-  },
-  {
     id: 'summary',
-    question: "Tell me about yourself in 2-3 sentences. What makes you unique as a professional?",
+    question: "Describe yourself as a professional in 3-4 sentences. What's your biggest strength and what value do you bring to employers?",
     category: 'professional',
     shortTitle: 'Summary',
-    followUp: null,
-    maxDuration: 30000
+    followUp: "What sets you apart from other professionals in your field?",
+    maxDuration: 45000
   },
   {
     id: 'recent_role',
-    question: "What's your most recent job title and company? Tell me about your role there.",
+    question: "What's your most recent or current job title and company? How long have you been in this role?",
     category: 'experience',
     shortTitle: 'Recent Role',
-    followUp: "What were your main responsibilities in this position?",
-    maxDuration: 45000
+    followUp: "Walk me through your key responsibilities and the size of your team or budget if applicable.",
+    maxDuration: 60000
   },
   {
     id: 'achievements',
-    question: "What professional achievements are you most proud of? Try to include specific numbers or results if you can.",
+    question: "What are your top 3-5 professional achievements? Please be specific with numbers - like percentages improved, money saved, team sizes, or projects delivered.",
     category: 'experience',
     shortTitle: 'Achievements',
-    followUp: null,
-    maxDuration: 45000
+    followUp: "Can you give me specific examples? For instance, did you increase sales, reduce costs, improve efficiency, or lead any major initiatives?",
+    maxDuration: 60000
+  },
+  {
+    id: 'previous_experience',
+    question: "Tell me about your previous work experience before your current role. Include company names, titles, and dates if you remember them.",
+    category: 'experience',
+    shortTitle: 'Previous Experience',
+    followUp: "What were your major accomplishments in those positions?",
+    maxDuration: 60000
   },
   {
     id: 'education',
-    question: "What's your educational background? Include your degree, school, and graduation year if relevant.",
+    question: "What's your educational background? Include your degree, major, university, and graduation year.",
     category: 'education',
     shortTitle: 'Education',
-    followUp: "Do you have any certifications or special training?",
-    maxDuration: 30000
+    followUp: "Do you have any certifications, professional licenses, or specialized training? Any relevant coursework or academic achievements?",
+    maxDuration: 45000
   },
   {
-    id: 'skills',
-    question: "What are your top technical skills and tools you're proficient with?",
+    id: 'technical_skills',
+    question: "What are your technical skills? Include programming languages, software, tools, frameworks, and platforms you're proficient with.",
     category: 'skills',
-    shortTitle: 'Skills',
-    followUp: "Any soft skills or languages you'd like to highlight?",
-    maxDuration: 30000
+    shortTitle: 'Technical Skills',
+    followUp: "What's your proficiency level with each? Expert, advanced, or intermediate?",
+    maxDuration: 45000
+  },
+  {
+    id: 'soft_skills',
+    question: "What are your key soft skills and professional competencies? Think about leadership, communication, problem-solving, project management, etc.",
+    category: 'skills',
+    shortTitle: 'Soft Skills',
+    followUp: "Any languages you speak? Any industry-specific knowledge or domain expertise?",
+    maxDuration: 45000
+  },
+  {
+    id: 'projects',
+    question: "Tell me about any notable projects you've led or contributed to. What was the project, your role, and the outcome?",
+    category: 'projects',
+    shortTitle: 'Projects',
+    followUp: "What technologies did you use and what was the impact or result?",
+    maxDuration: 45000
   },
   {
     id: 'goal',
-    question: "Finally, what type of role are you looking for? What's your ideal next position?",
+    question: "What type of role are you targeting? What's your ideal position, industry, and company size?",
     category: 'goals',
     shortTitle: 'Career Goals',
-    followUp: null,
-    maxDuration: 30000
+    followUp: "What are your salary expectations and when are you available to start?",
+    maxDuration: 45000
   }
 ];
 

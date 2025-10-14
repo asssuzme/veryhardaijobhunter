@@ -2106,69 +2106,137 @@ Best,
         return `Question: ${q.question}\nAnswer: ${answer}`;
       }).join('\n\n');
 
-      // Generate professional resume using OpenAI with structured format
+      // Generate professional resume using OpenAI with enhanced structured format
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
-            content: `You are a professional resume writer. Transform interview responses into a polished, ATS-optimized resume.
-            
-            Format the resume EXACTLY as follows using markdown:
-            
+            content: `You are an elite professional resume writer with 15+ years of experience. Create a powerful, ATS-optimized resume that will impress recruiters and hiring managers.
+
+            CRITICAL INSTRUCTIONS:
+            1. Use STRONG ACTION VERBS to start every bullet point
+            2. Include QUANTIFIED ACHIEVEMENTS with specific metrics wherever possible
+            3. Make the content COMPELLING and IMPACTFUL
+            4. Ensure all dates are in MM/YYYY format
+            5. Create rich, detailed content - NO weak or generic statements
+
+            FORMAT THE RESUME EXACTLY AS FOLLOWS:
+
             **[Full Name]**
-            [Email]
-            [Phone]
-            [Location]
-            
+            [Email] | [Phone] | [City, State] | [LinkedIn URL if provided] | [Website/Portfolio if provided]
+
             ---
-            
-            **Professional Summary**
-            [2-3 impactful sentences describing the candidate's value proposition, key strengths, and career objectives]
-            
-            **Work Experience**
-            
-            **[Job Title], [Company Name]**
-            [Location, if mentioned]
-            [Start Date] - [End Date or Present]
-            - [Achievement/responsibility with quantified results where possible]
-            - [Achievement/responsibility with action verbs]
-            - [Achievement/responsibility demonstrating impact]
-            
-            [Repeat for each position]
-            
-            **Education**
-            
-            **[Degree/Certification]**
-            [School/Institution Name]
-            [Graduation Date or Expected Date]
-            
-            **Skills**
-            - Technical Skills: [List relevant technical skills]
-            - Professional Skills: [List soft/professional skills]
-            - Tools & Technologies: [List tools, software, platforms]
-            
-            Use strong action verbs (achieved, led, implemented, increased, managed, developed, etc.).
-            Quantify achievements where possible (increased revenue by X%, managed team of Y, etc.).
-            Ensure professional tone throughout.
-            Return ONLY the formatted resume text, no explanations or metadata.`
+
+            **PROFESSIONAL SUMMARY**
+            [3-4 powerful sentences that immediately capture attention. Include:
+            - Years of experience and primary expertise
+            - Key strengths and unique value proposition
+            - Notable achievements or recognition
+            - Career objectives aligned with target roles
+            Make this section compelling - it's the first thing recruiters read!]
+
+            **PROFESSIONAL EXPERIENCE**
+
+            **[Job Title] | [Company Name]**
+            [City, State] | [MM/YYYY] - [MM/YYYY or Present]
+            • [Strong achievement starting with action verb, including metrics - e.g., "Increased revenue by 35% through..."]
+            • [Another quantified achievement - e.g., "Reduced operational costs by $200K annually by..."]
+            • [Leadership/collaboration achievement - e.g., "Led cross-functional team of 12 to deliver..."]
+            • [Process improvement achievement - e.g., "Streamlined workflow resulting in 40% efficiency gain..."]
+            • [Innovation/initiative achievement - e.g., "Pioneered new approach that..."]
+            [Include 4-6 bullets per role, focusing on IMPACT and RESULTS]
+
+            [Repeat for each position - include at least 2-3 positions if mentioned]
+
+            **EDUCATION**
+
+            **[Degree Type] in [Major/Field of Study]**
+            [University Name] | [City, State] | [MM/YYYY]
+            • GPA: [X.X/4.0] (only if 3.5 or higher)
+            • Relevant Coursework: [List 3-5 relevant courses if recent graduate]
+            • Academic Achievements: [Dean's List, honors, awards if mentioned]
+
+            **CERTIFICATIONS & PROFESSIONAL DEVELOPMENT**
+            • [Certification Name] | [Issuing Organization] | [MM/YYYY]
+            • [Professional Training/Course] | [Provider] | [MM/YYYY]
+            [Include all mentioned certifications and training]
+
+            **TECHNICAL SKILLS**
+            • Programming Languages: [List with proficiency levels - Expert/Advanced/Proficient]
+            • Frameworks & Libraries: [Comprehensive list]
+            • Databases & Cloud: [All mentioned platforms]
+            • Tools & Software: [Professional tools used]
+            • Methodologies: [Agile, Scrum, etc. if applicable]
+
+            **PROFESSIONAL COMPETENCIES**
+            • Leadership & Management: [Specific skills like team building, strategic planning]
+            • Communication: [Presentation, negotiation, stakeholder management]
+            • Analytical Skills: [Problem-solving, data analysis, critical thinking]
+            • Languages: [List languages with proficiency levels]
+
+            **NOTABLE PROJECTS** (if mentioned)
+            **[Project Name]**
+            • Role: [Your specific role]
+            • Technologies: [Tech stack used]
+            • Impact: [Quantified results and business value delivered]
+
+            **ACHIEVEMENTS & RECOGNITION** (if any mentioned)
+            • [Award, recognition, or notable achievement with date]
+
+            ACTION VERB BANK TO USE:
+            Leadership: Spearheaded, Orchestrated, Championed, Pioneered, Transformed
+            Achievement: Exceeded, Surpassed, Delivered, Accomplished, Attained
+            Improvement: Optimized, Streamlined, Enhanced, Revitalized, Modernized
+            Growth: Expanded, Accelerated, Amplified, Scaled, Maximized
+            Innovation: Innovated, Designed, Architected, Engineered, Developed
+            Analysis: Analyzed, Evaluated, Assessed, Investigated, Diagnosed
+            Management: Directed, Coordinated, Administered, Supervised, Oversaw
+
+            QUANTIFICATION GUIDELINES:
+            - Always include numbers: percentages, dollar amounts, time saved, team sizes
+            - If exact numbers aren't provided, use ranges: "10-15 team members", "$100K+ budget"
+            - Show scale: "enterprise-level", "company-wide", "cross-functional"
+            - Include frequency: "daily", "weekly", "monthly", "quarterly"
+
+            QUALITY STANDARDS:
+            - NO generic statements like "responsible for" or "helped with"
+            - NO passive voice - use active, powerful language
+            - NO spelling or grammatical errors
+            - NO inconsistent formatting or date formats
+            - EVERY bullet point must demonstrate VALUE and IMPACT
+
+            Return ONLY the formatted resume text with rich, compelling content.`
           },
           {
             role: "user",
-            content: `Create a professional resume from these interview responses:\n\n${interviewSummary}`
+            content: `Create a professional resume from these interview responses:\n\n${interviewSummary}\n\nREMEMBER: Make this resume exceptional with quantified achievements, strong action verbs, and compelling content that will impress recruiters.`
           }
         ],
         temperature: 0.7,
-        max_tokens: 2000
+        max_tokens: 3000
       });
 
-      const resumeText = completion.choices[0]?.message?.content || '';
+      let resumeText = completion.choices[0]?.message?.content || '';
       
       if (!resumeText) {
         throw new Error('Failed to generate resume content');
       }
 
-      // Save the generated resume to database
+      // Import enhancement utilities and post-process the resume
+      const { enhanceResumeText, validateResume } = await import('./utils/resume-enhancer');
+      
+      // Enhance the generated resume
+      resumeText = enhanceResumeText(resumeText);
+      
+      // Validate the resume quality
+      const validation = validateResume(resumeText);
+      if (!validation.isValid) {
+        console.log('[VOICE-RESUME] Quality issues detected:', validation.issues);
+        // Continue anyway, but log the issues for monitoring
+      }
+
+      // Save the enhanced resume to database
       await storage.saveUserResume(req.user!.id, {
         resumeText,
         resumeFileName: 'ai_generated_resume.txt',
