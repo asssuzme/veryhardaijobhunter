@@ -1583,7 +1583,7 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
                           </div>
                           <div className="text-center">
                             <div className="p-3 rounded-lg bg-green-500/10 inline-block mb-2">
-                              <Star className="h-6 w-6 text-green-400" />
+                              <CheckCircle className="h-6 w-6 text-green-400" />
                             </div>
                             <p className="text-xs text-gray-400">Smart AI</p>
                           </div>
