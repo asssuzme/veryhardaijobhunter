@@ -1503,21 +1503,30 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
 
                   {/* Vapi Status */}
                   <div className="flex flex-col items-center space-y-6">
-                    {/* Animated Avatar - Larger and more prominent */}
-                    <motion.div
-                      className="scale-125 mb-8"
-                      initial={{ scale: 0.8, opacity: 0 }}
-                      animate={{ scale: 1.25, opacity: 1 }}
-                      transition={{ type: "spring", stiffness: 200, damping: 20 }}
-                    >
-                      <VoiceAssistantAvatar
-                        isListening={vapiStatus === 'connected' && !isSpeaking}
-                        isSpeaking={isSpeaking}
-                        isProcessing={vapiStatus === 'connecting'}
-                        voiceLevel={voiceLevel}
-                        className=""
-                      />
-                    </motion.div>
+                    {/* Animated Avatar - Direct rendering with explicit sizing */}
+                    <div className="relative w-40 h-40 mb-8 flex items-center justify-center">
+                      {/* Always show fallback first, VoiceAssistantAvatar will overlay when ready */}
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        {/* Static avatar base - always visible */}
+                        <div className="w-32 h-32 rounded-full bg-gradient-to-br from-green-500 to-teal-600 flex items-center justify-center shadow-2xl">
+                          <div className="absolute inset-0 rounded-full animate-ping bg-green-500/30"></div>
+                          <Mic className="w-12 h-12 text-white z-10" />
+                        </div>
+                      </div>
+                      
+                      {/* VoiceAssistantAvatar overlays when it renders */}
+                      {vapiClient && (
+                        <div className="absolute inset-0 flex items-center justify-center z-20">
+                          <VoiceAssistantAvatar
+                            isListening={vapiStatus === 'connected' && !isSpeaking}
+                            isSpeaking={isSpeaking}
+                            isProcessing={vapiStatus === 'connecting'}
+                            voiceLevel={voiceLevel}
+                            className=""
+                          />
+                        </div>
+                      )}
+                    </div>
                     
                     {vapiStatus === 'connecting' && (
                       <motion.div
