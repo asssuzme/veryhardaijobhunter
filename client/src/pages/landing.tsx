@@ -720,7 +720,7 @@ export default function Landing() {
                   <Button
                     className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-full text-lg font-medium hover:from-blue-700 hover:to-purple-700 transition-all py-6"
                   >
-                    Start free trial
+                    Get a Free Job
                     <ArrowRight className="ml-2 w-5 h-5" />
                   </Button>
                 </Link>
@@ -790,7 +790,7 @@ export default function Landing() {
                   <Button
                     className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-lg font-medium transition-all"
                   >
-                    Start free trial
+                    Get a Free Job
                     <ArrowRight className="ml-2 w-5 h-5" />
                   </Button>
                 </Link>
