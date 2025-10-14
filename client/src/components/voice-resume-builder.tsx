@@ -1503,97 +1503,106 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
 
                   {/* Vapi Status */}
                   <div className="flex flex-col items-center space-y-6">
-                    {/* Animated Avatar */}
-                    <VoiceAssistantAvatar
-                      isListening={vapiStatus === 'connected' && !isSpeaking}
-                      isSpeaking={isSpeaking}
-                      isProcessing={vapiStatus === 'connecting'}
-                      voiceLevel={voiceLevel}
-                      className="mb-4"
-                    />
+                    {/* Animated Avatar - Larger and more prominent */}
+                    <motion.div
+                      className="scale-125 mb-8"
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1.25, opacity: 1 }}
+                      transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                    >
+                      <VoiceAssistantAvatar
+                        isListening={vapiStatus === 'connected' && !isSpeaking}
+                        isSpeaking={isSpeaking}
+                        isProcessing={vapiStatus === 'connecting'}
+                        voiceLevel={voiceLevel}
+                        className=""
+                      />
+                    </motion.div>
                     
                     {vapiStatus === 'connecting' && (
                       <motion.div
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="flex flex-col items-center space-y-4"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 }}
+                        className="flex flex-col items-center space-y-4 -mt-8"
                       >
-                        <p className="text-yellow-400 font-medium">Connecting to AI Coach...</p>
+                        <p className="text-yellow-400 font-medium text-lg">Connecting to AI Coach...</p>
                         <div className="w-64">
                           <Progress value={30} className="h-2" />
                         </div>
+                        <p className="text-gray-400 text-sm">Setting up your personalized interview session</p>
                       </motion.div>
                     )}
 
                     {vapiStatus === 'connected' && (
                       <motion.div
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="flex flex-col items-center space-y-6 w-full"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.2 }}
+                        className="flex flex-col items-center w-full"
                       >
-                        {/* Active Call Indicator */}
-                        <div className="relative">
-                          <motion.div
-                            className="absolute inset-0 rounded-full bg-green-400/20"
-                            animate={{ scale: [1, 1.2, 1] }}
-                            transition={{ duration: 1.5, repeat: Infinity }}
-                          />
-                          <div className="relative p-6 rounded-full bg-green-500/10">
-                            <motion.div
-                              animate={{ scale: [1, 1.05, 1] }}
-                              transition={{ duration: 0.8, repeat: Infinity }}
-                            >
-                              <MessageSquare className="h-12 w-12 text-green-400" />
-                            </motion.div>
+                        {/* Voice Level Indicator - Right below the avatar */}
+                        <motion.div 
+                          className="w-full max-w-xs -mt-8 mb-6"
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.3 }}
+                        >
+                          <div className="bg-gray-800/50 backdrop-blur-sm rounded-full p-3">
+                            <div className="flex items-center gap-2">
+                              <Activity className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                              <div className="flex-1 h-2 bg-gray-700 rounded-full overflow-hidden">
+                                <motion.div 
+                                  className="h-full bg-gradient-to-r from-green-400 to-blue-400"
+                                  animate={{ width: `${Math.min(voiceLevel * 1000, 100)}%` }}
+                                  transition={{ duration: 0.05 }}
+                                />
+                              </div>
+                              <span className="text-xs text-gray-400 min-w-[35px] text-right">{Math.round(voiceLevel * 100)}%</span>
+                            </div>
                           </div>
-                        </div>
-                        
-                        <div className="text-center">
-                          <p className="text-green-400 font-medium text-lg mb-2">Interview Active</p>
-                          <p className="text-gray-400 text-sm">Speak naturally - the AI is listening</p>
-                        </div>
+                        </motion.div>
 
-                        {/* Voice Level Indicator */}
-                        <div className="w-full max-w-md">
-                          <div className="flex items-center gap-3 mb-2">
-                            <Activity className="h-4 w-4 text-gray-400" />
-                            <div className="flex-1 h-2 bg-gray-700 rounded-full overflow-hidden">
-                              <motion.div 
-                                className="h-full bg-gradient-to-r from-green-400 to-blue-400"
-                                animate={{ width: `${Math.min(voiceLevel * 1000, 100)}%` }}
-                                transition={{ duration: 0.1 }}
-                              />
+                        {/* Features during call - Compact */}
+                        <div className="grid grid-cols-3 gap-3 mt-4 w-full max-w-sm">
+                          <motion.div 
+                            className="text-center"
+                            whileHover={{ scale: 1.05 }}
+                            transition={{ type: "spring", stiffness: 400 }}
+                          >
+                            <div className="p-2 rounded-lg bg-purple-500/10 inline-block mb-1">
+                              <Zap className="h-5 w-5 text-purple-400" />
                             </div>
-                          </div>
-                        </div>
-
-                        {/* Features during call */}
-                        <div className="grid grid-cols-3 gap-4 mt-6">
-                          <div className="text-center">
-                            <div className="p-3 rounded-lg bg-purple-500/10 inline-block mb-2">
-                              <Zap className="h-6 w-6 text-purple-400" />
+                            <p className="text-xs text-gray-400">Natural</p>
+                          </motion.div>
+                          <motion.div 
+                            className="text-center"
+                            whileHover={{ scale: 1.05 }}
+                            transition={{ type: "spring", stiffness: 400 }}
+                          >
+                            <div className="p-2 rounded-lg bg-blue-500/10 inline-block mb-1">
+                              <Shield className="h-5 w-5 text-blue-400" />
                             </div>
-                            <p className="text-xs text-gray-400">Natural Conversation</p>
-                          </div>
-                          <div className="text-center">
-                            <div className="p-3 rounded-lg bg-blue-500/10 inline-block mb-2">
-                              <Shield className="h-6 w-6 text-blue-400" />
-                            </div>
-                            <p className="text-xs text-gray-400">95% Accuracy</p>
-                          </div>
-                          <div className="text-center">
-                            <div className="p-3 rounded-lg bg-green-500/10 inline-block mb-2">
-                              <CheckCircle className="h-6 w-6 text-green-400" />
+                            <p className="text-xs text-gray-400">95% Accurate</p>
+                          </motion.div>
+                          <motion.div 
+                            className="text-center"
+                            whileHover={{ scale: 1.05 }}
+                            transition={{ type: "spring", stiffness: 400 }}
+                          >
+                            <div className="p-2 rounded-lg bg-green-500/10 inline-block mb-1">
+                              <CheckCircle className="h-5 w-5 text-green-400" />
                             </div>
                             <p className="text-xs text-gray-400">Smart AI</p>
-                          </div>
+                          </motion.div>
                         </div>
 
                         {/* End Call Button */}
                         <Button
                           onClick={endProInterview}
                           variant="outline"
-                          className="mt-4 border-red-500/30 hover:bg-red-500/10 text-red-400"
+                          className="mt-6 border-red-500/30 hover:bg-red-500/10 text-red-400"
+                          size="sm"
                         >
                           <Phone className="h-4 w-4 mr-2 rotate-[135deg]" />
                           End Interview
@@ -1603,19 +1612,41 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
 
                     {vapiStatus === 'ended' && (
                       <motion.div
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="flex flex-col items-center space-y-4"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2 }}
+                        className="flex flex-col items-center space-y-4 -mt-8"
                       >
-                        <Loader2 className="h-16 w-16 text-yellow-400 animate-spin" />
-                        <p className="text-yellow-400 font-medium text-lg">Call Ended</p>
-                        <p className="text-gray-400">The conversation has ended. Processing may take a moment...</p>
+                        <div className="flex flex-col items-center space-y-3">
+                          <CheckCircle className="h-12 w-12 text-green-400" />
+                          <p className="text-green-400 font-medium text-lg">Interview Completed</p>
+                          <p className="text-gray-400 text-sm text-center max-w-md">
+                            Great job! Your conversation has been recorded. Processing your resume now...
+                          </p>
+                        </div>
+                        
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: "16rem" }}
+                          transition={{ duration: 2, ease: "easeInOut" }}
+                          className="h-2 bg-gray-700 rounded-full overflow-hidden"
+                        >
+                          <motion.div 
+                            className="h-full bg-gradient-to-r from-green-400 to-blue-400"
+                            animate={{ x: ["0%", "100%"] }}
+                            transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                            style={{ width: "50%" }}
+                          />
+                        </motion.div>
+                        
                         <Button
                           onClick={() => {
                             setMode('choice');
                             setVapiStatus('idle');
                           }}
+                          variant="outline"
                           className="mt-4"
+                          size="sm"
                         >
                           Back to Options
                         </Button>
