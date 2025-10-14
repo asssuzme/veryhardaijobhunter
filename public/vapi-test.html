@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vapi SDK Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 4px;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .stop-button {
+            background: #dc3545;
+        }
+        .stop-button:hover {
+            background: #c82333;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 4px;
+            background: #f8f9fa;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .status.connecting {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .logs {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #007bff;
+            padding-left: 10px;
+        }
+        .log-entry.error {
+            border-left-color: #dc3545;
+            color: #dc3545;
+        }
+        .log-entry.success {
+            border-left-color: #28a745;
+            color: #28a745;
+        }
+        .config-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        label {
+            display: block;
+            margin-top: 10px;
+            font-weight: bold;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 Vapi SDK Test Page</h1>
+        
+        <div class="status" id="status">
+            Status: Not Connected
+        </div>
+
+        <div class="config-section">
+            <h3>Configuration</h3>
+            <label for="publicKey">Public Key:</label>
+            <input type="text" id="publicKey" value="668f8fb5-3aac-45f9-ab43-591b20c985d4" />
+            
+            <label for="assistantId">Assistant ID:</label>
+            <input type="text" id="assistantId" value="86969d3b-28ef-4967-9841-3919f448c64c" />
+        </div>
+
+        <div class="button-group">
+            <button id="testBasic">Test Basic Connection</button>
+            <button id="testAssistant">Test with Assistant ID</button>
+            <button id="testInline">Test with Inline Config</button>
+            <button id="testServer">Test Server API</button>
+            <button id="stopCall" class="stop-button">Stop Call</button>
+        </div>
+
+        <div class="logs" id="logs">
+            <div class="log-entry">Waiting for test to start...</div>
+        </div>
+    </div>
+
+    <!-- Load Vapi SDK from CDN -->
+    <script type="module">
+        import Vapi from 'https://cdn.jsdelivr.net/npm/@vapi-ai/web@2.3.9/dist/index.js';
+        
+        let vapi = null;
+        let isCallActive = false;
+
+        // Logging function
+        function log(message, type = 'info') {
+            const logsDiv = document.getElementById('logs');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            logsDiv.appendChild(entry);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+            console.log(`[VAPI TEST] ${message}`);
+        }
+
+        // Update status
+        function updateStatus(message, type = 'normal') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = `Status: ${message}`;
+            statusDiv.className = `status ${type}`;
+        }
+
+        // Clear logs
+        function clearLogs() {
+            const logsDiv = document.getElementById('logs');
+            logsDiv.innerHTML = '';
+        }
+
+        // Test basic connection
+        document.getElementById('testBasic').addEventListener('click', async () => {
+            clearLogs();
+            log('Starting basic connection test...');
+            
+            const publicKey = document.getElementById('publicKey').value;
+            log(`Using public key: ${publicKey}`);
+            
+            try {
+                if (vapi) {
+                    log('Cleaning up previous instance...');
+                    vapi.stop();
+                    vapi = null;
+                }
+                
+                log('Creating new Vapi instance...');
+                vapi = new Vapi(publicKey);
+                log('Vapi instance created successfully', 'success');
+                
+                // Set up event listeners
+                log('Setting up event listeners...');
+                
+                vapi.on('call-start', () => {
+                    log('✅ Call started successfully!', 'success');
+                    updateStatus('Connected', 'connected');
+                    isCallActive = true;
+                });
+                
+                vapi.on('call-end', () => {
+                    log('📞 Call ended', 'info');
+                    updateStatus('Disconnected', 'normal');
+                    isCallActive = false;
+                });
+                
+                vapi.on('speech-start', () => {
+                    log('🎤 Speech started');
+                });
+                
+                vapi.on('speech-end', () => {
+                    log('🔇 Speech ended');
+                });
+                
+                vapi.on('message', (message) => {
+                    log(`💬 Message: ${JSON.stringify(message)}`);
+                });
+                
+                vapi.on('error', (error) => {
+                    log(`❌ Error: ${JSON.stringify(error)}`, 'error');
+                    updateStatus('Error', 'error');
+                });
+                
+                log('Event listeners set up successfully', 'success');
+                
+            } catch (error) {
+                log(`❌ Failed to initialize Vapi: ${error.message}`, 'error');
+                updateStatus('Initialization Failed', 'error');
+            }
+        });
+
+        // Test with Assistant ID
+        document.getElementById('testAssistant').addEventListener('click', async () => {
+            if (!vapi) {
+                log('Please run basic connection test first', 'error');
+                return;
+            }
+            
+            clearLogs();
+            log('Testing with Assistant ID...');
+            
+            const assistantId = document.getElementById('assistantId').value;
+            log(`Using Assistant ID: ${assistantId}`);
+            
+            updateStatus('Connecting...', 'connecting');
+            
+            try {
+                log('Calling vapi.start() with assistant ID...');
+                await vapi.start(assistantId);
+                log('✅ vapi.start() completed successfully', 'success');
+            } catch (error) {
+                log(`❌ vapi.start() failed: ${error.message}`, 'error');
+                log(`Error details: ${JSON.stringify(error)}`, 'error');
+                
+                // Try to get more details
+                if (error.response) {
+                    log(`Response data: ${JSON.stringify(error.response)}`, 'error');
+                }
+                
+                updateStatus('Failed to Start', 'error');
+            }
+        });
+
+        // Test with Inline Config
+        document.getElementById('testInline').addEventListener('click', async () => {
+            if (!vapi) {
+                log('Please run basic connection test first', 'error');
+                return;
+            }
+            
+            clearLogs();
+            log('Testing with inline configuration...');
+            
+            updateStatus('Connecting...', 'connecting');
+            
+            const inlineConfig = {
+                name: "Test Assistant",
+                model: {
+                    provider: "openai",
+                    model: "gpt-3.5-turbo",
+                    messages: [
+                        {
+                            role: "system",
+                            content: "You are a helpful assistant. Say hello and ask how you can help."
+                        }
+                    ]
+                },
+                voice: {
+                    provider: "11labs",
+                    voiceId: "21m00Tcm4TlvDq8ikWAM" // Rachel voice
+                },
+                transcriber: {
+                    provider: "deepgram",
+                    model: "nova-2",
+                    language: "en"
+                },
+                firstMessage: "Hello! How can I help you today?"
+            };
+            
+            log(`Using config: ${JSON.stringify(inlineConfig, null, 2)}`);
+            
+            try {
+                log('Calling vapi.start() with inline config...');
+                await vapi.start(inlineConfig);
+                log('✅ vapi.start() completed successfully', 'success');
+            } catch (error) {
+                log(`❌ vapi.start() failed: ${error.message}`, 'error');
+                log(`Error details: ${JSON.stringify(error)}`, 'error');
+                updateStatus('Failed to Start', 'error');
+            }
+        });
+
+        // Test Server API
+        document.getElementById('testServer').addEventListener('click', async () => {
+            clearLogs();
+            log('Testing server API endpoints...');
+            
+            try {
+                // Test if user is authenticated
+                log('Checking authentication status...');
+                const authResponse = await fetch('/api/auth/user', {
+                    credentials: 'include'
+                });
+                
+                if (!authResponse.ok) {
+                    log('User not authenticated. Please login first.', 'error');
+                    return;
+                }
+                
+                log('User is authenticated', 'success');
+                
+                // Test starting interview via server
+                log('Testing /api/resume/vapi/start-interview endpoint...');
+                const response = await fetch('/api/resume/vapi/start-interview', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        userName: 'Test User'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log(`✅ Server API successful: ${JSON.stringify(data)}`, 'success');
+                    
+                    if (data.assistantId) {
+                        document.getElementById('assistantId').value = data.assistantId;
+                        log(`Assistant ID updated: ${data.assistantId}`, 'success');
+                    }
+                    
+                    if (data.publicKey) {
+                        document.getElementById('publicKey').value = data.publicKey;
+                        log(`Public Key from server: ${data.publicKey}`, 'success');
+                    }
+                } else {
+                    log(`❌ Server API failed: ${JSON.stringify(data)}`, 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ Server test failed: ${error.message}`, 'error');
+            }
+        });
+
+        // Stop call
+        document.getElementById('stopCall').addEventListener('click', () => {
+            if (vapi && isCallActive) {
+                log('Stopping call...');
+                vapi.stop();
+                updateStatus('Stopped', 'normal');
+                isCallActive = false;
+            } else {
+                log('No active call to stop', 'error');
+            }
+        });
+
+        // Initial log
+        log('Test page loaded. Click a button to start testing.');
+    </script>
+</body>
+</html>

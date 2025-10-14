@@ -24,7 +24,8 @@ import {
   Clock,
   TrendingUp,
   CreditCard,
-  Crown
+  Crown,
+  Settings
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -41,7 +42,15 @@ import {
 } from "@/components/ui/alert";
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import Vapi from '@vapi-ai/web';
+import { VapiConfigHelper } from '@/components/vapi-config-helper';
 
 interface VoiceResumeBuilderProps {
   isOpen: boolean;
@@ -155,6 +164,7 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
   const [vapiClient, setVapiClient] = useState<any>(null);
   const [vapiCallId, setVapiCallId] = useState<string | null>(null);
   const [vapiStatus, setVapiStatus] = useState<'idle' | 'connecting' | 'connected' | 'ended'>('idle');
+  const [showVapiConfig, setShowVapiConfig] = useState(false);
   
   // Continuous conversation states
   const [isListening, setIsListening] = useState(false);
@@ -725,19 +735,36 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
     }
   };
 
-  // Start Pro interview with Vapi - SIMPLIFIED VERSION
+  // Start Pro interview with Vapi - IMPROVED VERSION
   const startProInterview = async () => {
     setErrorMessage('');
     setIsProMode(true);
     setMode('pro-interview');
     setVapiStatus('connecting');
     
-    console.log('🚀 Starting Pro Interview (Simplified)...');
+    console.log('🚀 Starting Pro Interview...');
     
     try {
-      // Initialize Vapi with just the public key - no complex setup
-      const publicKey = '668f8fb5-3aac-45f9-ab43-591b20c985d4';
-      console.log('📌 Using public key:', publicKey);
+      // Get public key from localStorage or fallback
+      let publicKey = localStorage.getItem('vapi_public_key') || '668f8fb5-3aac-45f9-ab43-591b20c985d4';
+      
+      // Try to get from server if not in localStorage
+      if (!localStorage.getItem('vapi_public_key')) {
+        try {
+          const response = await apiRequest('/api/resume/vapi/start-interview', 'POST', {
+            userName: 'User'
+          });
+          
+          if (response.publicKey) {
+            publicKey = response.publicKey;
+            console.log('📌 Got public key from server');
+          }
+        } catch (err) {
+          console.log('Could not get public key from server, using fallback');
+        }
+      }
+      
+      console.log('📌 Using public key:', publicKey.substring(0, 10) + '...');
       
       const vapi = new Vapi(publicKey);
       setVapiClient(vapi);
@@ -759,9 +786,28 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
       });
       
       vapi.on('error', (error: any) => {
-        console.error('❌ Vapi error:', error);
-        console.error('Error details:', JSON.stringify(error, null, 2));
-        setErrorMessage(`Error: ${error.message || JSON.stringify(error) || 'Connection failed'}`);
+        console.error('❌ Vapi error event:', error);
+        
+        // Better error message handling
+        let errorMsg = 'Connection error: ';
+        
+        if (error?.type === 'start-method-error') {
+          const origin = window.location.origin;
+          errorMsg = `Failed to start call. The public key may be invalid or not configured for this domain (${origin}). `;
+          errorMsg += `Click "Configure Vapi" button to set up your public key.`;
+          
+          // Show configuration dialog
+          setShowVapiConfig(true);
+        } else if (error?.message) {
+          errorMsg += error.message;
+        } else if (error?.error) {
+          errorMsg += JSON.stringify(error.error);
+        } else {
+          errorMsg += 'Unknown error occurred';
+        }
+        
+        setErrorMessage(errorMsg);
+        console.error('Full error object:', JSON.stringify(error, null, 2));
       });
       
       // Try Method 1: Direct assistant ID (hardcoded for testing)
@@ -949,8 +995,9 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
   };
 
   return (
-    <AnimatePresence>
-      {isOpen && (
+    <>
+      <AnimatePresence>
+        {isOpen && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -1243,7 +1290,19 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
                       <Alert className="bg-red-900/20 border-red-500/30">
                         <AlertCircle className="h-4 w-4" />
                         <AlertDescription>
-                          {errorMessage}
+                          <div>{errorMessage}</div>
+                          {errorMessage.includes('public key') && (
+                            <div className="mt-3">
+                              <Button
+                                size="sm"
+                                onClick={() => setShowVapiConfig(true)}
+                                className="bg-orange-600 hover:bg-orange-700"
+                              >
+                                <Settings className="h-4 w-4 mr-2" />
+                                Configure Vapi
+                              </Button>
+                            </div>
+                          )}
                         </AlertDescription>
                       </Alert>
                     )}
@@ -1688,7 +1747,33 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
             )}
           </motion.div>
         </motion.div>
-      )}
-    </AnimatePresence>
+        )}
+      </AnimatePresence>
+      
+      {/* Vapi Configuration Dialog */}
+      <Dialog open={showVapiConfig} onOpenChange={setShowVapiConfig}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Configure Vapi for Voice Interview</DialogTitle>
+            <DialogDescription>
+              Set up your Vapi public key to enable AI-powered voice interviews
+            </DialogDescription>
+          </DialogHeader>
+          
+          <VapiConfigHelper
+            assistantId="86969d3b-28ef-4967-9841-3919f448c64c"
+            onSuccess={(publicKey) => {
+              // Store the public key and retry
+              localStorage.setItem('vapi_public_key', publicKey);
+              setShowVapiConfig(false);
+              setErrorMessage('');
+              
+              // Retry the interview with the new key
+              startProInterview();
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
