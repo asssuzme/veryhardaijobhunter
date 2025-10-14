@@ -1489,7 +1489,7 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
                   <div className="text-center">
                     <div className="inline-flex items-center gap-2 mb-4">
                       <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-4 py-1.5 text-sm">
-                        <Crown className="h-4 w-4 mr-1" />
+                        <Shield className="h-4 w-4 mr-1" />
                         PRO INTERVIEW IN PROGRESS
                       </Badge>
                     </div>
