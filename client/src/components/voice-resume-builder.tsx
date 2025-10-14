@@ -763,12 +763,12 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
         }
       });
       
-      vapi.on('call-end', async (event: any) => {
-        console.log('📞 Vapi call ended with event:', event);
+      vapi.on('call-end', async () => {
+        console.log('📞 Vapi call ended');
         setVapiStatus('ended');
         
-        // Get messages from the event
-        const messages = event?.messages || vapiTranscript;
+        // Get messages from the transcript state
+        const messages = vapiTranscript;
         
         // Generate resume using the transcript
         if (messages && messages.length > 0) {
@@ -1257,18 +1257,7 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
                         <AlertCircle className="h-4 w-4" />
                         <AlertDescription>
                           <div>{errorMessage}</div>
-                          {errorMessage.includes('public key') && (
-                            <div className="mt-3">
-                              <Button
-                                size="sm"
-                                onClick={() => setShowVapiConfig(true)}
-                                className="bg-orange-600 hover:bg-orange-700"
-                              >
-                                <Settings className="h-4 w-4 mr-2" />
-                                Configure Vapi
-                              </Button>
-                            </div>
-                          )}
+                          {/* Configuration button removed - using hardcoded keys */}
                         </AlertDescription>
                       </Alert>
                     )}

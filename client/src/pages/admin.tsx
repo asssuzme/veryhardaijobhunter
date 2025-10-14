@@ -56,7 +56,7 @@ export default function AdminDashboard() {
   // Check if user is admin
   useEffect(() => {
     const adminEmails = ['ashutoshlath@gmail.com', 'ashutoshlathvalo@gmail.com'];
-    if (user && !adminEmails.includes(user.email)) {
+    if (user && !adminEmails.includes(user?.email || '')) {
       setLocation('/dashboard');
     }
   }, [user, setLocation]);
@@ -64,8 +64,8 @@ export default function AdminDashboard() {
   // Debug logging
   useEffect(() => {
     if (user) {
-      console.log('Current user:', user?.email);
-      console.log('Is admin?', ['ashutoshlath@gmail.com', 'ashutoshlathvalo@gmail.com'].includes(user?.email || ''));
+      console.log('Current user:', (user as any)?.email);
+      console.log('Is admin?', ['ashutoshlath@gmail.com', 'ashutoshlathvalo@gmail.com'].includes((user as any)?.email || ''));
     }
   }, [user]);
 
