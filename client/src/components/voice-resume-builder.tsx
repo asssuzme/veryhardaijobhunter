@@ -277,34 +277,7 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
     }
   }, [mode, conversationState, isPaused]);
 
-  // Save progress to localStorage
-  useEffect(() => {
-    if (mode === 'interview' && !isPaused) {
-      const progress = {
-        currentQuestionIndex,
-        answers,
-        completedQuestions: Array.from(completedQuestions)
-      };
-      localStorage.setItem('voiceResumeProgress', JSON.stringify(progress));
-    }
-  }, [currentQuestionIndex, answers, completedQuestions, mode, isPaused]);
 
-  // Load saved progress
-  const loadSavedProgress = () => {
-    const saved = localStorage.getItem('voiceResumeProgress');
-    if (saved) {
-      try {
-        const progress = JSON.parse(saved);
-        setCurrentQuestionIndex(progress.currentQuestionIndex || 0);
-        setAnswers(progress.answers || {});
-        setCompletedQuestions(new Set(progress.completedQuestions || []));
-        return true;
-      } catch (error) {
-        console.error('Error loading saved progress:', error);
-      }
-    }
-    return false;
-  };
 
   // Initialize audio context and analyser for Voice Activity Detection
   const initializeAudioContext = async () => {
@@ -702,33 +675,17 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
   };
 
   // Start interview
-  const startInterview = async (resumeFromSaved = false) => {
+  const startInterview = async () => {
     setErrorMessage('');
     setIsProMode(false);
     
-    if (resumeFromSaved && loadSavedProgress()) {
-      toast({
-        title: "Progress restored",
-        description: "Continuing from where you left off"
-      });
-      setMode('interview');
-      
-      // Initialize audio and start conversation
-      const stream = await initializeAudioContext();
-      if (!stream) return;
-      
-      // Start the interview with the current question
-      setTimeout(() => {
-        speakWithAcknowledgment(INTERVIEW_QUESTIONS[currentQuestionIndex].question);
-      }, 1000);
-    } else {
-      setCurrentQuestionIndex(0);
-      setAnswers({});
-      setCompletedQuestions(new Set());
-      
-      // Start with calibration for new interviews
-      calibrateMicrophone();
-    }
+    // Always start fresh
+    setCurrentQuestionIndex(0);
+    setAnswers({});
+    setCompletedQuestions(new Set());
+    
+    // Start with calibration for new interviews
+    calibrateMicrophone();
   };
 
   // Start Pro interview with Vapi - IMPROVED VERSION
@@ -980,7 +937,6 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
   const generateResume = async () => {
     setMode('processing');
     cleanup();
-    localStorage.removeItem('voiceResumeProgress');
     
     try {
       const response = await apiRequest('/api/resume/generate-from-interview', {
@@ -1040,36 +996,6 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
                     Resume Required
                   </h2>
                   <p className="text-sm text-gray-500 dark:text-gray-400">Select your preferred method to add your resume</p>
-                  
-                  {/* Check for saved progress */}
-                  {localStorage.getItem('voiceResumeProgress') && (
-                    <Alert className="mt-4 bg-purple-900/20 border-purple-500/30">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertTitle>Resume in Progress</AlertTitle>
-                      <AlertDescription>
-                        You have a saved interview session. Would you like to continue?
-                        <div className="mt-2 flex gap-2">
-                          <Button 
-                            size="sm" 
-                            onClick={() => startInterview(true)}
-                            className="bg-purple-500 hover:bg-purple-600"
-                          >
-                            Continue Interview
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => {
-                              localStorage.removeItem('voiceResumeProgress');
-                              startInterview(false);
-                            }}
-                          >
-                            Start Over
-                          </Button>
-                        </div>
-                      </AlertDescription>
-                    </Alert>
-                  )}
                 </div>
                 
                 <div className="grid md:grid-cols-2 gap-4 max-w-3xl mx-auto">
