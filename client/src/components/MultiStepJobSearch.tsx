@@ -299,11 +299,11 @@ export function MultiStepJobSearch({ isOpen, onClose, onComplete }: MultiStepJob
   return (
     <>
       <Dialog open={isOpen && !showVoiceBuilder} onOpenChange={onClose}>
-        <DialogContent className="max-w-2xl h-[85vh] sm:h-[75vh] p-0 gap-0 overflow-hidden">
+        <DialogContent className="max-w-2xl h-[90vh] sm:h-[85vh] p-0 gap-0 overflow-hidden">
           {/* Header with progress */}
-          <div className="px-8 pt-8 pb-4 border-b">
+          <div className="px-8 pt-6 pb-3 border-b">
             {/* Progress indicator */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 {[1, 2, 3, 4].map((step) => (
                   <div key={step} className="flex items-center">
@@ -345,10 +345,10 @@ export function MultiStepJobSearch({ isOpen, onClose, onComplete }: MultiStepJob
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  className="px-8 py-12 space-y-8"
+                  className="px-8 py-6 space-y-6"
                 >
-                  <div className="text-center space-y-3">
-                    <div className="inline-flex p-3 rounded-full bg-primary/10 mb-4">
+                  <div className="text-center space-y-2">
+                    <div className="inline-flex p-2.5 rounded-full bg-primary/10 mb-2">
                       <Briefcase className="h-8 w-8 text-primary" />
                     </div>
                     <h2 className="text-2xl font-bold">What job are you looking for?</h2>
@@ -357,7 +357,7 @@ export function MultiStepJobSearch({ isOpen, onClose, onComplete }: MultiStepJob
                     </p>
                   </div>
 
-                  <div className="max-w-md mx-auto space-y-6">
+                  <div className="max-w-md mx-auto space-y-4">
                     <Input
                       placeholder="e.g. Software Engineer, Product Manager"
                       value={formData.jobRole}
@@ -370,7 +370,7 @@ export function MultiStepJobSearch({ isOpen, onClose, onComplete }: MultiStepJob
                       }}
                     />
 
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       <p className="text-sm text-muted-foreground text-center">
                         Popular searches:
                       </p>
@@ -399,10 +399,10 @@ export function MultiStepJobSearch({ isOpen, onClose, onComplete }: MultiStepJob
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  className="px-8 py-12 space-y-8"
+                  className="px-8 py-6 space-y-6"
                 >
-                  <div className="text-center space-y-3">
-                    <div className="inline-flex p-3 rounded-full bg-primary/10 mb-4">
+                  <div className="text-center space-y-2">
+                    <div className="inline-flex p-2.5 rounded-full bg-primary/10 mb-2">
                       <MapPin className="h-8 w-8 text-primary" />
                     </div>
                     <h2 className="text-2xl font-bold">Where do you want to work?</h2>
@@ -411,7 +411,7 @@ export function MultiStepJobSearch({ isOpen, onClose, onComplete }: MultiStepJob
                     </p>
                   </div>
 
-                  <div className="max-w-md mx-auto space-y-6">
+                  <div className="max-w-md mx-auto space-y-4">
                     <Input
                       placeholder="e.g. San Francisco, Remote, New York"
                       value={formData.location}
@@ -424,7 +424,7 @@ export function MultiStepJobSearch({ isOpen, onClose, onComplete }: MultiStepJob
                       }}
                     />
 
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       <p className="text-sm text-muted-foreground text-center">
                         Popular locations:
                       </p>
@@ -453,10 +453,10 @@ export function MultiStepJobSearch({ isOpen, onClose, onComplete }: MultiStepJob
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  className="px-8 py-12 space-y-8"
+                  className="px-8 py-6 space-y-6"
                 >
-                  <div className="text-center space-y-3">
-                    <div className="inline-flex p-3 rounded-full bg-primary/10 mb-4">
+                  <div className="text-center space-y-2">
+                    <div className="inline-flex p-2.5 rounded-full bg-primary/10 mb-2">
                       <Building2 className="h-8 w-8 text-primary" />
                     </div>
                     <h2 className="text-2xl font-bold">How do you prefer to work?</h2>
@@ -520,7 +520,7 @@ export function MultiStepJobSearch({ isOpen, onClose, onComplete }: MultiStepJob
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  className="px-8 py-8 space-y-6"
+                  className="px-8 py-6 space-y-4"
                 >
                   <div className="text-center space-y-2">
                     <div className="inline-flex p-2.5 rounded-full bg-blue-50 dark:bg-blue-900/20 mb-3">
