@@ -73,6 +73,52 @@ export function setupAuthRoutes(app: Express) {
   // Google OAuth callback
   app.get('/api/auth/google/callback', handleGoogleCallback);
   
+  // DEVELOPMENT ONLY: Test authentication
+  if (process.env.NODE_ENV === 'development') {
+    app.get('/api/auth/test', async (req: any, res) => {
+      try {
+        // Create or get test user
+        const testEmail = 'test@example.com';
+        
+        let [user] = await db
+          .select()
+          .from(users)
+          .where(eq(users.email, testEmail))
+          .limit(1);
+        
+        if (!user) {
+          [user] = await db
+            .insert(users)
+            .values({
+              email: testEmail,
+              firstName: 'Test',
+              lastName: 'User',
+              createdAt: new Date(),
+              updatedAt: new Date()
+            })
+            .returning();
+        }
+        
+        // Set session
+        req.session.userId = user.id;
+        
+        // Save session before redirecting
+        req.session.save((err: any) => {
+          if (err) {
+            console.error('Session save error:', err);
+            return res.status(500).json({ error: 'Failed to save session' });
+          }
+          
+          // Redirect to resume page
+          res.redirect('/resume');
+        });
+      } catch (error) {
+        console.error('Test auth error:', error);
+        res.status(500).json({ error: 'Test auth failed' });
+      }
+    });
+  }
+  
   // Logout
   app.post('/api/auth/logout', (req: any, res) => {
     // Store session ID for logging

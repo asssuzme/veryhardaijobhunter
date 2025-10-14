@@ -788,6 +788,36 @@ async function processJobScrapingAsync(requestId: string, linkedinUrl: string) {
 
 // Simple auth middleware
 async function requireAuth(req: Request, res: Response, next: NextFunction) {
+  // Development bypass for testing
+  if (process.env.NODE_ENV === 'development' && req.headers['x-test-auth'] === 'test') {
+    // Create or get test user for development
+    const [testUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, 'test@example.com'))
+      .limit(1);
+    
+    if (testUser) {
+      req.user = testUser as Express.User;
+      return next();
+    }
+    
+    // Create test user if doesn't exist
+    const [newUser] = await db
+      .insert(users)
+      .values({
+        email: 'test@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+        createdAt: new Date(),
+        updatedAt: new Date()
+      })
+      .returning();
+    
+    req.user = newUser as Express.User;
+    return next();
+  }
+  
   if (!req.session.userId) {
     return res.status(401).json({ message: 'Unauthorized' });
   }

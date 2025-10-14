@@ -16,6 +16,7 @@ import Applications from "@/pages/applications";
 import Analytics from "@/pages/analytics";
 import Settings from "@/pages/settings";
 import Subscribe from "@/pages/subscribe";
+import Resume from "@/pages/resume";
 import PrivacyPolicy from "@/pages/privacy-policy";
 import { Terms } from "@/pages/terms";
 import TermsOfService from "@/pages/terms-of-service";
@@ -60,6 +61,7 @@ function Router() {
       <Route path="/applications" component={isAuthenticated ? Applications : ProtectedRouteRedirect} />
       <Route path="/analytics" component={isAuthenticated ? Analytics : ProtectedRouteRedirect} />
       <Route path="/settings" component={isAuthenticated ? Settings : ProtectedRouteRedirect} />
+      <Route path="/resume" component={isAuthenticated ? Resume : ProtectedRouteRedirect} />
       <Route path="/subscribe" component={isAuthenticated ? Subscribe : ProtectedRouteRedirect} />
       <Route path="/upgrade" component={isAuthenticated ? Upgrade : ProtectedRouteRedirect} />
       <Route path="/results/:requestId" component={isAuthenticated ? Results : ProtectedRouteRedirect} />
