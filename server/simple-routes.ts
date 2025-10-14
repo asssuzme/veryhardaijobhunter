@@ -1804,6 +1804,7 @@ Best,
           ? 'Resume uploaded and processed successfully'
           : 'Resume uploaded but text extraction failed. Email generation may not work properly. Please upload a text-based PDF or DOCX file.',
         fileName,
+        text: resumeText, // Return the actual resume text
         textExtracted: textExtractionSuccess,
         textLength: resumeText?.length || 0,
         warning: !textExtractionSuccess 

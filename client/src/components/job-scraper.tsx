@@ -44,6 +44,7 @@ import { cn } from "@/lib/utils";
 import { z } from "zod";
 import { DotsLoader } from "@/components/ui/loading-animations";
 import { JobSearchForm } from "@/components/job-search-form";
+import { ResumeSection } from "@/components/resume-section";
 
 interface JobScrapingResponse {
   id: string;
@@ -137,7 +138,6 @@ export function JobScraper({ onComplete }: JobScraperProps = {}) {
   const [hasExistingResume, setHasExistingResume] = useState(false);
   const [isAborted, setIsAborted] = useState(false);
   const abortRef = useRef(false); // Use ref for immediate abort tracking
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -287,43 +287,6 @@ export function JobScraper({ onComplete }: JobScraperProps = {}) {
 
     }
   }, [scrapingResult, onComplete, toast, isAborted]);
-
-  // Handle file upload
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append('resume', file);
-
-    try {
-      const response = await fetch('/api/resume/upload', {
-        method: 'POST',
-        body: formData,
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        throw new Error(`Upload failed: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      
-      setResumeText(data.text);
-      setResumeFileName(file.name);
-      setHasExistingResume(true); // Mark that user now has a resume
-      toast({
-        title: "Resume Uploaded & Saved",
-        description: `${file.name} has been saved to your account. You won't need to upload it again.`
-      });
-    } catch (error: any) {
-      toast({
-        title: "Upload Failed",
-        description: error.message || "Failed to process file",
-        variant: "destructive",
-      });
-    }
-  };
 
   const handleSubmit = (data: JobSearchFormData) => {
     // Check if resume is required (for first-time users)
@@ -1161,12 +1124,30 @@ export function JobScraper({ onComplete }: JobScraperProps = {}) {
     );
   }
 
+  const handleResumeUploaded = (resumeText: string, fileName: string) => {
+    setResumeText(resumeText);
+    setResumeFileName(fileName);
+    setHasExistingResume(true);
+    toast({
+      title: "Resume ready!",
+      description: "Your resume is now loaded and ready for job applications.",
+    });
+  };
+
   return (
-    <JobSearchForm
-      onSubmit={handleSubmit}
-      isProcessing={isProcessing}
-      hasExistingResume={hasExistingResume}
-      resumeContent={
+    <div className="space-y-6">
+      {/* Prominent Resume Section */}
+      <ResumeSection 
+        onResumeUploaded={handleResumeUploaded}
+        className="mb-6"
+      />
+      
+      {/* Job Search Form */}
+      <JobSearchForm
+        onSubmit={handleSubmit}
+        isProcessing={isProcessing}
+        hasExistingResume={hasExistingResume}
+        resumeContent={
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -1207,41 +1188,10 @@ export function JobScraper({ onComplete }: JobScraperProps = {}) {
                 </Button>
               </div>
             </div>
-          ) : (
-            <div className={`glass-card p-3 sm:p-4 border-dashed border-2 transition-all cursor-pointer group min-h-[80px] sm:min-h-[100px] flex items-center ${
-              !resumeText ? 'border-red-500/30 hover:border-red-500/50' : 'border-primary/20 hover:border-primary/40'
-            }`}>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".txt,.pdf,.jpg,.jpeg,.png,.webp"
-                onChange={handleFileUpload}
-                className="hidden"
-                disabled={isProcessing}
-              />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full flex flex-col items-center justify-center gap-3"
-                disabled={isProcessing}
-              >
-                <div className="p-2 sm:p-3 rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                  <Upload className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-                </div>
-                <div className="text-center">
-                  <p className="font-medium text-sm sm:text-base">Drop your resume here</p>
-                  <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                    <span className="text-red-500">Required for first search</span> • Supports .txt, .pdf, and image files
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Will be saved to your account for future searches
-                  </p>
-                </div>
-              </button>
-            </div>
-          )}
+          ) : null}
         </motion.div>
       }
-    />
+      />
+    </div>
   );
 }
