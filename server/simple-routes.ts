@@ -837,6 +837,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // === AUTHENTICATION ROUTES ===
   
+  // OAuth Debug Endpoint - Remove this after testing
+  app.get('/api/debug/oauth-config', (req: Request, res: Response) => {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const hasSecret = !!process.env.GOOGLE_CLIENT_SECRET;
+    const secretLength = process.env.GOOGLE_CLIENT_SECRET?.length || 0;
+    
+    res.json({
+      configured: !!clientId && hasSecret,
+      clientId: clientId || 'NOT_SET',
+      clientIdLength: clientId?.length || 0,
+      hasClientSecret: hasSecret,
+      clientSecretLength: secretLength,
+      // Show first 4 and last 4 chars of secret for verification (safe to show partial)
+      secretPreview: hasSecret && secretLength > 8 
+        ? `${process.env.GOOGLE_CLIENT_SECRET?.substring(0, 4)}...${process.env.GOOGLE_CLIENT_SECRET?.substring(secretLength - 4)}`
+        : 'TOO_SHORT_OR_MISSING',
+      redirectUri: `https://${req.get('host')}/api/auth/google/callback`,
+      host: req.get('host'),
+      expectedFormat: 'Client secret should be around 32-35 characters, starting with GOCSPX- for newer clients'
+    });
+  });
+  
   // Get current user
   app.get("/api/auth/user", async (req, res) => {
     console.log('Auth check - Session ID:', req.sessionID);
