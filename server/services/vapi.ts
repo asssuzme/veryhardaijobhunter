@@ -3,9 +3,9 @@ import { db } from '../db';
 import { vapiCalls } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 
-// Initialize Vapi client
+// Initialize Vapi client with hardcoded key
 const vapi = new VapiClient({
-  token: process.env.VAPI_API_KEY || ''
+  token: process.env.VAPI_API_KEY || '4be7cd46-4c1e-45c8-b919-7cbabf4da23d'
 });
 
 // Interview questions for the assistant
@@ -84,10 +84,7 @@ export const startVapiInterview = async (userId: string, userName?: string) => {
   console.log('startVapiInterview called for user:', userId, 'userName:', userName);
   
   try {
-    // Check if Vapi API key is configured
-    if (!process.env.VAPI_API_KEY) {
-      throw new Error('VAPI_API_KEY environment variable is not configured');
-    }
+    // Vapi API key is hardcoded, no need to check
     
     // Create or get assistant
     console.log('Listing existing assistants...');

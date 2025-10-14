@@ -50,7 +50,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import Vapi from '@vapi-ai/web';
-import { VapiConfigHelper } from '@/components/vapi-config-helper';
+import { VoiceAssistantAvatar } from '@/components/voice-assistant-avatar';
 
 interface VoiceResumeBuilderProps {
   isOpen: boolean;
@@ -164,7 +164,7 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
   const [vapiClient, setVapiClient] = useState<any>(null);
   const [vapiCallId, setVapiCallId] = useState<string | null>(null);
   const [vapiStatus, setVapiStatus] = useState<'idle' | 'connecting' | 'connected' | 'ended'>('idle');
-  const [showVapiConfig, setShowVapiConfig] = useState(false);
+  const [vapiTranscript, setVapiTranscript] = useState<any[]>([]); // Store transcript messages
   
   // Continuous conversation states
   const [isListening, setIsListening] = useState(false);
@@ -745,26 +745,9 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
     console.log('🚀 Starting Pro Interview...');
     
     try {
-      // Get public key from localStorage or fallback
-      let publicKey = localStorage.getItem('vapi_public_key') || '668f8fb5-3aac-45f9-ab43-591b20c985d4';
-      
-      // Try to get from server if not in localStorage
-      if (!localStorage.getItem('vapi_public_key')) {
-        try {
-          const response = await apiRequest('/api/resume/vapi/start-interview', 'POST', {
-            userName: 'User'
-          });
-          
-          if (response.publicKey) {
-            publicKey = response.publicKey;
-            console.log('📌 Got public key from server');
-          }
-        } catch (err) {
-          console.log('Could not get public key from server, using fallback');
-        }
-      }
-      
-      console.log('📌 Using public key:', publicKey.substring(0, 10) + '...');
+      // Use hardcoded public key - no configuration needed
+      const publicKey = 'f594f7a1-8900-4d13-a6d6-f6d544036ff1';
+      console.log('📌 Using hardcoded public key');
       
       const vapi = new Vapi(publicKey);
       setVapiClient(vapi);
@@ -776,11 +759,26 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
         setErrorMessage('');
       });
       
-      vapi.on('call-end', async () => {
-        console.log('📞 Vapi call ended');
+      // Capture messages for transcript
+      vapi.on('message', (message: any) => {
+        console.log('💬 Vapi message:', message);
+        if (message?.role && message?.content) {
+          setVapiTranscript(prev => [...prev, message]);
+        }
+      });
+      
+      vapi.on('call-end', async (event: any) => {
+        console.log('📞 Vapi call ended with event:', event);
         setVapiStatus('ended');
-        // Only generate resume if we have a valid call
-        if (vapiCallId) {
+        
+        // Get messages from the event
+        const messages = event?.messages || vapiTranscript;
+        
+        // Generate resume using the transcript
+        if (messages && messages.length > 0) {
+          await handleVapiCallEnd(messages);
+        } else if (vapiCallId) {
+          // Fallback to fetching transcript from server
           await handleVapiCallEnd(vapiCallId);
         }
       });
@@ -793,11 +791,7 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
         
         if (error?.type === 'start-method-error') {
           const origin = window.location.origin;
-          errorMsg = `Failed to start call. The public key may be invalid or not configured for this domain (${origin}). `;
-          errorMsg += `Click "Configure Vapi" button to set up your public key.`;
-          
-          // Show configuration dialog
-          setShowVapiConfig(true);
+          errorMsg = `Failed to start call. The public key may be invalid or not configured for this domain (${origin}). Please contact support.`;
         } else if (error?.message) {
           errorMsg += error.message;
         } else if (error?.error) {
@@ -875,19 +869,42 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
     }
   };
 
-  // Handle Vapi call end
-  const handleVapiCallEnd = async (callId: string) => {
+  // Handle Vapi call end - enhanced to handle transcript directly
+  const handleVapiCallEnd = async (callIdOrMessages: string | any[]) => {
     setMode('processing');
     
     try {
-      // Get transcript
-      const transcriptResponse = await apiRequest(`/api/resume/vapi/transcript/${callId}`);
+      let transcriptText = '';
       
-      if (transcriptResponse.success && transcriptResponse.transcript) {
+      // Check if we have messages array directly
+      if (Array.isArray(callIdOrMessages)) {
+        console.log('📝 Processing transcript from messages:', callIdOrMessages);
+        
+        // Convert messages array to transcript text
+        transcriptText = callIdOrMessages
+          .filter(msg => msg.role && msg.content)
+          .map(msg => `${msg.role}: ${msg.content}`)
+          .join('\n\n');
+        
+        console.log('📄 Converted transcript:', transcriptText);
+      } else {
+        // Fallback to fetching from server
+        console.log('📥 Fetching transcript from server with ID:', callIdOrMessages);
+        const transcriptResponse = await apiRequest(`/api/resume/vapi/transcript/${callIdOrMessages}`);
+        
+        if (transcriptResponse.success && transcriptResponse.transcript) {
+          transcriptText = transcriptResponse.transcript;
+        }
+      }
+      
+      if (transcriptText) {
         // Generate resume from transcript
         const resumeResponse = await apiRequest('/api/resume/vapi/generate', {
           method: 'POST',
-          body: JSON.stringify({ callId })
+          body: JSON.stringify({ 
+            transcript: transcriptText,
+            callId: typeof callIdOrMessages === 'string' ? callIdOrMessages : null 
+          })
         });
         
         if (resumeResponse.success && resumeResponse.resume) {
@@ -897,19 +914,24 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
             description: "Your professional resume has been generated from your Pro interview"
           });
           onClose();
+        } else {
+          throw new Error('Failed to generate resume from transcript');
         }
+      } else {
+        throw new Error('No transcript available');
       }
     } catch (error) {
       console.error('Error processing Vapi call:', error);
       toast({
         title: "Error",
-        description: "Failed to generate resume. Please contact support.",
+        description: "Failed to generate resume. Please try again or contact support.",
         variant: "destructive"
       });
     }
     
     setMode('choice');
     setVapiStatus('idle');
+    setVapiTranscript([]); // Clear transcript
   };
 
   // End Pro interview
@@ -1537,22 +1559,21 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
 
                   {/* Vapi Status */}
                   <div className="flex flex-col items-center space-y-6">
+                    {/* Animated Avatar */}
+                    <VoiceAssistantAvatar
+                      isListening={vapiStatus === 'connected' && !isSpeaking}
+                      isSpeaking={isSpeaking}
+                      isProcessing={vapiStatus === 'connecting'}
+                      voiceLevel={voiceLevel}
+                      className="mb-4"
+                    />
+                    
                     {vapiStatus === 'connecting' && (
                       <motion.div
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
                         className="flex flex-col items-center space-y-4"
                       >
-                        <div className="relative">
-                          <motion.div
-                            className="absolute inset-0 rounded-full bg-yellow-400/20"
-                            animate={{ scale: [1, 1.3, 1] }}
-                            transition={{ duration: 2, repeat: Infinity }}
-                          />
-                          <div className="relative p-6 rounded-full bg-gradient-to-r from-yellow-500/10 to-orange-500/10">
-                            <Phone className="h-12 w-12 text-yellow-400 animate-pulse" />
-                          </div>
-                        </div>
                         <p className="text-yellow-400 font-medium">Connecting to AI Coach...</p>
                         <div className="w-64">
                           <Progress value={30} className="h-2" />
@@ -1749,31 +1770,6 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
         </motion.div>
         )}
       </AnimatePresence>
-      
-      {/* Vapi Configuration Dialog */}
-      <Dialog open={showVapiConfig} onOpenChange={setShowVapiConfig}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Configure Vapi for Voice Interview</DialogTitle>
-            <DialogDescription>
-              Set up your Vapi public key to enable AI-powered voice interviews
-            </DialogDescription>
-          </DialogHeader>
-          
-          <VapiConfigHelper
-            assistantId="86969d3b-28ef-4967-9841-3919f448c64c"
-            onSuccess={(publicKey) => {
-              // Store the public key and retry
-              localStorage.setItem('vapi_public_key', publicKey);
-              setShowVapiConfig(false);
-              setErrorMessage('');
-              
-              // Retry the interview with the new key
-              startProInterview();
-            }}
-          />
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

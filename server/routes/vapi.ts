@@ -89,10 +89,56 @@ router.get('/api/resume/vapi/transcript/:callId', requireAuth, async (req: any, 
 // Generate resume from Vapi transcript
 router.post('/api/resume/vapi/generate', requireAuth, async (req: any, res) => {
   try {
-    const { callId } = req.body;
+    const { callId, transcript } = req.body;
     const userId = req.session.userId;
 
-    const result = await generateResumeFromTranscript(callId, userId);
+    let result;
+    
+    // If transcript is provided directly, use it
+    if (transcript) {
+      const openai = (await import('openai')).default;
+      const client = new openai({
+        apiKey: process.env.OPENAI_API_KEY
+      });
+
+      const completion = await client.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          {
+            role: "system",
+            content: `You are a professional resume writer. Extract information from the interview transcript and create a well-formatted resume.
+
+Format the resume with the following sections:
+1. Name and Contact Information
+2. Professional Summary (2-3 sentences)
+3. Work Experience (with bullet points for achievements)
+4. Education
+5. Skills
+6. Additional Information (if relevant)
+
+Use professional language and action verbs. Include specific metrics and achievements when mentioned.`
+          },
+          {
+            role: "user",
+            content: `Create a professional resume from this interview transcript:\n\n${transcript}`
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 2000
+      });
+
+      const resumeText = completion.choices[0].message.content;
+      
+      result = {
+        success: true,
+        resume: resumeText
+      };
+    } else if (callId) {
+      // Fallback to fetching transcript from database
+      result = await generateResumeFromTranscript(callId, userId);
+    } else {
+      throw new Error('No transcript or callId provided');
+    }
     
     // Save resume to user's profile
     if (result.success && result.resume) {
