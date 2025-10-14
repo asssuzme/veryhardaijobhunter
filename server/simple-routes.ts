@@ -2450,6 +2450,105 @@ Best,
     }
   });
 
+  // Export resume as JSON
+  app.get("/api/resume/export/json", requireAuth, async (req, res) => {
+    try {
+      const userResume = await storage.getUserResume(req.user!.id);
+      
+      if (!userResume?.resumeText) {
+        return res.status(404).json({ error: 'No resume found' });
+      }
+      
+      const { parseResumeText } = await import('./utils/resume-parser');
+      const structuredResume = parseResumeText(userResume.resumeText);
+      
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', 'attachment; filename="resume.json"');
+      res.json(structuredResume);
+      
+    } catch (error) {
+      console.error('Export JSON error:', error);
+      res.status(500).json({ 
+        error: 'Failed to export resume as JSON',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+  
+  // Export resume as DOCX
+  app.get("/api/resume/export/docx", requireAuth, async (req, res) => {
+    try {
+      const { theme = 'modern' } = req.query;
+      const userResume = await storage.getUserResume(req.user!.id);
+      
+      if (!userResume?.resumeText) {
+        return res.status(404).json({ error: 'No resume found' });
+      }
+      
+      const { parseResumeText } = await import('./utils/resume-parser');
+      const structuredResume = parseResumeText(userResume.resumeText);
+      
+      const { generateResumeDocx } = await import('./utils/resume-docx-generator');
+      const docxBuffer = await generateResumeDocx(structuredResume, theme as any);
+      
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      res.setHeader('Content-Disposition', 'attachment; filename="resume.docx"');
+      res.send(docxBuffer);
+      
+    } catch (error) {
+      console.error('Export DOCX error:', error);
+      res.status(500).json({ 
+        error: 'Failed to export resume as DOCX',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+  
+  // Get resume analytics and metadata
+  app.get("/api/resume/analytics", requireAuth, async (req, res) => {
+    try {
+      const userResume = await storage.getUserResume(req.user!.id);
+      
+      if (!userResume?.resumeText) {
+        return res.status(404).json({ error: 'No resume found' });
+      }
+      
+      const { parseResumeText } = await import('./utils/resume-parser');
+      const structuredResume = parseResumeText(userResume.resumeText);
+      
+      const { calculateATSScore, getWordCount, getSectionsCompleted } = await import('./utils/resume-docx-generator');
+      
+      const atsAnalysis = calculateATSScore(structuredResume);
+      const wordCount = getWordCount(structuredResume);
+      const sectionsData = getSectionsCompleted(structuredResume);
+      
+      // Calculate file size (approximate)
+      const fileSize = new TextEncoder().encode(userResume.resumeText).length;
+      
+      res.json({
+        atsScore: atsAnalysis.score,
+        atsAnalysis,
+        wordCount,
+        fileSize,
+        fileSizeFormatted: `${(fileSize / 1024).toFixed(1)} KB`,
+        sectionsCompleted: sectionsData.completed,
+        sectionsTotal: sectionsData.total,
+        sections: sectionsData.sections,
+        source: userResume.source || 'upload',
+        uploadedAt: userResume.resumeUploadedAt,
+        updatedAt: userResume.resumeUpdatedAt,
+        fileType: userResume.resumeFileType,
+      });
+      
+    } catch (error) {
+      console.error('Get resume analytics error:', error);
+      res.status(500).json({ 
+        error: 'Failed to get resume analytics',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   // TEMPORARY TEST ENDPOINT - Remove after testing poster URL detection
   app.get('/api/test-scraping/:requestId', async (req, res) => {
     try {
