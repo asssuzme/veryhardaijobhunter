@@ -1,7 +1,7 @@
 # ai-jobhunter.com
 
 ## Overview
-ai-jobhunter.com is a web service designed to automate job applications. It scrapes LinkedIn job data, enriches it with contact information, and generates AI-powered emails for application. The platform features Google OAuth authentication, a modern SaaS-inspired UI with glassmorphism effects and dark mode support, and Framer Motion animations. Key capabilities include resume upload (text and PDF), automated resume storage and reuse, and a comprehensive job search form with location autocomplete and predefined job roles. The service aims to provide a seamless and efficient job application experience, offering features like AI-powered voice interview for resume creation, professional resume viewing with multiple themes, and PDF generation.
+ai-jobhunter.com is a web service designed to automate job applications. It scrapes LinkedIn job data, enriches it with contact information, and generates AI-powered emails for application. The platform features Google OAuth authentication, a modern SaaS-inspired UI with glassmorphism effects and dark mode support, and Framer Motion animations. Key capabilities include resume upload (multiple formats), AI-powered resume creation with voice interviews, professional resume viewing with multiple themes and templates, comprehensive resume analytics, and multi-format export options (PDF, JSON, DOCX). The service provides a complete resume management system with ATS optimization and professional-grade output.
 
 ## User Preferences
 Preferred communication style: Technical and detailed explanations with specifics.
