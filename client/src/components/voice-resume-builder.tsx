@@ -4,8 +4,8 @@ import {
   Mic, 
   MicOff, 
   Upload, 
-  Brain,
-  Sparkles,
+  UserCircle,
+  FileText,
   Volume2,
   CheckCircle,
   Loader2,
@@ -18,13 +18,9 @@ import {
   Zap,
   Headphones,
   Phone,
-  Star,
   Shield,
   MessageSquare,
   Clock,
-  TrendingUp,
-  CreditCard,
-  Crown,
   Settings
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -1038,12 +1034,12 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
             className="w-full max-w-5xl max-h-[90vh] overflow-y-auto"
           >
             {mode === 'choice' && (
-              <div className="space-y-6">
-                <div className="text-center mb-8">
-                  <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-                    Create Your Resume
+              <div className="space-y-4">
+                <div className="text-center mb-6">
+                  <h2 className="text-2xl font-semibold mb-2 text-gray-900 dark:text-gray-100">
+                    Resume Required
                   </h2>
-                  <p className="text-gray-400">Choose how you'd like to create your professional resume</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Select your preferred method to add your resume</p>
                   
                   {/* Check for saved progress */}
                   {localStorage.getItem('voiceResumeProgress') && (
@@ -1076,134 +1072,82 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
                   )}
                 </div>
                 
-                <div className="grid md:grid-cols-3 gap-6">
+                <div className="grid md:grid-cols-2 gap-4 max-w-3xl mx-auto">
                   {/* Upload Option */}
                   <Card 
-                    className="glass-card p-6 cursor-pointer hover:scale-[1.02] transition-transform"
+                    className="p-5 cursor-pointer hover:shadow-md transition-all border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 bg-white dark:bg-gray-900"
                     onClick={onUploadClick}
                   >
-                    <div className="flex flex-col items-center text-center space-y-4">
-                      <div className="p-4 rounded-full bg-blue-500/10">
-                        <Upload className="h-12 w-12 text-blue-400" />
+                    <div className="flex flex-col items-center text-center space-y-3">
+                      <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20">
+                        <FileText className="h-8 w-8 text-blue-600 dark:text-blue-400" />
                       </div>
-                      <h3 className="text-xl font-semibold">Upload Resume</h3>
-                      <p className="text-sm text-gray-400">
-                        Have a resume ready? Upload your PDF, Word doc, or text file
+                      <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Upload Resume</h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Upload your existing resume file
                       </p>
-                      <Button className="w-full mt-4 bg-blue-500 hover:bg-blue-600">
-                        <Upload className="h-4 w-4 mr-2" />
-                        Choose File
-                      </Button>
-                    </div>
-                  </Card>
-                  
-                  {/* Free Voice Interview Option */}
-                  <Card 
-                    className="glass-card p-6 cursor-pointer hover:scale-[1.02] transition-transform"
-                    onClick={() => startInterview(false)}
-                  >
-                    <div className="flex flex-col items-center text-center space-y-4">
-                      <div className="p-4 rounded-full bg-purple-500/10">
-                        <Mic className="h-12 w-12 text-purple-400" />
+                      <div className="flex gap-1.5 justify-center text-xs">
+                        <span className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">PDF</span>
+                        <span className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">TXT</span>
+                        <span className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">Image</span>
                       </div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <Badge className="bg-green-500/20 text-green-400 border-green-400/30">
-                          Free
-                        </Badge>
-                        <Badge className="bg-blue-500/20 text-blue-400 border-blue-400/30">
-                          <Headphones className="h-3 w-3 mr-1" />
-                          Voice
-                        </Badge>
-                      </div>
-                      <h3 className="text-xl font-semibold">Free AI Interview</h3>
-                      <ul className="text-sm text-gray-400 text-left space-y-2 mt-3">
-                        <li className="flex items-start gap-2">
-                          <Check className="h-4 w-4 text-green-400 mt-0.5 shrink-0" />
-                          <span>Browser-based recording</span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <Check className="h-4 w-4 text-green-400 mt-0.5 shrink-0" />
-                          <span>AI-generated questions</span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <Check className="h-4 w-4 text-green-400 mt-0.5 shrink-0" />
-                          <span>Basic transcription</span>
-                        </li>
-                      </ul>
-                      <Button className="w-full mt-4 bg-purple-500 hover:bg-purple-600">
-                        <Mic className="h-4 w-4 mr-2" />
-                        Start Free Interview
+                      <Button size="sm" className="w-full mt-3 bg-blue-600 hover:bg-blue-700 text-white">
+                        <Upload className="h-3.5 w-3.5 mr-1.5" />
+                        Select File
                       </Button>
                     </div>
                   </Card>
                   
                   {/* Pro Voice Interview Option */}
                   <Card 
-                    className="glass-card p-6 cursor-pointer hover:scale-[1.02] transition-transform border-gradient-to-r from-yellow-500/30 to-orange-500/30 relative"
+                    className="p-5 cursor-pointer hover:shadow-md transition-all border-gray-200 dark:border-gray-700 hover:border-indigo-400 dark:hover:border-indigo-500 bg-white dark:bg-gray-900 relative"
                     onClick={() => startProInterview()}
                   >
-                    <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                      <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-3 py-1">
-                        <Crown className="h-3 w-3 mr-1" />
-                        PREMIUM
+                    <div className="absolute -top-2 -right-2">
+                      <Badge className="bg-indigo-600 text-white px-1.5 py-0.5 text-xs font-medium">
+                        PRO
                       </Badge>
                     </div>
-                    <div className="flex flex-col items-center text-center space-y-4">
-                      <div className="p-4 rounded-full bg-gradient-to-r from-yellow-500/10 to-orange-500/10 relative">
-                        <Phone className="h-12 w-12 text-yellow-400" />
-                        <Sparkles className="h-6 w-6 text-orange-400 absolute -top-1 -right-1 animate-pulse" />
+                    <div className="flex flex-col items-center text-center space-y-3">
+                      <div className="p-3 rounded-lg bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-900/20 dark:to-blue-900/20">
+                        <UserCircle className="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
                       </div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <Badge className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 text-yellow-400 border-yellow-400/30">
-                          <Star className="h-3 w-3 mr-1" />
-                          Pro
-                        </Badge>
-                        <Badge className="bg-green-500/20 text-green-400 border-green-400/30">
-                          <TrendingUp className="h-3 w-3 mr-1" />
-                          95% Accuracy
-                        </Badge>
-                      </div>
-                      <h3 className="text-xl font-semibold bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
+                      <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
                         Pro AI Interview
                       </h3>
-                      <ul className="text-sm text-gray-300 text-left space-y-2 mt-3">
-                        <li className="flex items-start gap-2">
-                          <Star className="h-4 w-4 text-yellow-400 mt-0.5 shrink-0" />
-                          <span>Natural conversation - interrupt anytime</span>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Build your resume through AI conversation
+                      </p>
+                      <ul className="text-xs text-gray-600 dark:text-gray-400 text-left space-y-1.5 mt-2">
+                        <li className="flex items-start gap-1.5">
+                          <Check className="h-3 w-3 text-indigo-600 dark:text-indigo-400 mt-0.5 shrink-0" />
+                          <span>Natural conversation flow</span>
                         </li>
-                        <li className="flex items-start gap-2">
-                          <Star className="h-4 w-4 text-yellow-400 mt-0.5 shrink-0" />
-                          <span>Professional AI voice (ElevenLabs)</span>
+                        <li className="flex items-start gap-1.5">
+                          <Check className="h-3 w-3 text-indigo-600 dark:text-indigo-400 mt-0.5 shrink-0" />
+                          <span>Professional AI voice</span>
                         </li>
-                        <li className="flex items-start gap-2">
-                          <Star className="h-4 w-4 text-yellow-400 mt-0.5 shrink-0" />
-                          <span>Smart follow-up questions</span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <Star className="h-4 w-4 text-yellow-400 mt-0.5 shrink-0" />
-                          <span>95%+ accurate transcription</span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <Star className="h-4 w-4 text-yellow-400 mt-0.5 shrink-0" />
-                          <span>Context-aware responses</span>
+                        <li className="flex items-start gap-1.5">
+                          <Check className="h-3 w-3 text-indigo-600 dark:text-indigo-400 mt-0.5 shrink-0" />
+                          <span>High accuracy transcription</span>
                         </li>
                       </ul>
-                      <div className="w-full space-y-2 mt-4">
-                        <Button className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-semibold">
-                          <Phone className="h-4 w-4 mr-2" />
-                          Start Pro Interview
+                      <div className="w-full space-y-1 mt-3">
+                        <Button size="sm" className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white">
+                          <Mic className="h-3.5 w-3.5 mr-1.5" />
+                          Start Interview
                         </Button>
-                        <p className="text-xs text-gray-500">Natural AI conversation</p>
+                        <p className="text-xs text-gray-500">5 minute session</p>
                       </div>
                     </div>
                   </Card>
                 </div>
                 
-                {/* Feature comparison */}
-                <div className="mt-8 text-center">
-                  <p className="text-sm text-gray-500">
-                    <Shield className="h-4 w-4 inline mr-1" />
-                    All interviews are private and secure. Your data is never shared.
+                {/* Security notice */}
+                <div className="mt-4 text-center">
+                  <p className="text-xs text-gray-500 flex items-center justify-center gap-1">
+                    <Shield className="h-3 w-3" />
+                    Your data is secure and private
                   </p>
                 </div>
               </div>

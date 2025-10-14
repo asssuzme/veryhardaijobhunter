@@ -18,8 +18,7 @@ import {
   Loader2,
   X,
   FileText,
-  Brain,
-  Sparkles
+  UserCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -521,17 +520,17 @@ export function MultiStepJobSearch({ isOpen, onClose, onComplete }: MultiStepJob
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  className="px-8 py-12 space-y-8"
+                  className="px-8 py-8 space-y-6"
                 >
-                  <div className="text-center space-y-3">
-                    <div className="inline-flex p-3 rounded-full bg-primary/10 mb-4">
-                      <Sparkles className="h-8 w-8 text-primary" />
+                  <div className="text-center space-y-2">
+                    <div className="inline-flex p-2.5 rounded-full bg-blue-50 dark:bg-blue-900/20 mb-3">
+                      <FileText className="h-7 w-7 text-blue-600 dark:text-blue-400" />
                     </div>
-                    <h2 className="text-2xl font-bold">Let's Get Your Resume Ready!</h2>
-                    <p className="text-muted-foreground">
+                    <h2 className="text-xl font-semibold">Resume Required</h2>
+                    <p className="text-sm text-muted-foreground">
                       {hasExistingResume 
-                        ? "You already have a resume on file. You can skip or update it."
-                        : "Choose how you'd like to add your resume"}
+                        ? "You already have a resume on file. You can proceed or update it."
+                        : "Select your preferred method to add your resume"}
                     </p>
                   </div>
 
@@ -572,11 +571,11 @@ export function MultiStepJobSearch({ isOpen, onClose, onComplete }: MultiStepJob
                       </div>
                     </div>
                   ) : (
-                    <div className="max-w-2xl mx-auto grid md:grid-cols-2 gap-4">
+                    <div className="max-w-2xl mx-auto grid md:grid-cols-2 gap-3">
                       {/* Upload Resume Card */}
                       <motion.div
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
+                        whileHover={{ scale: 1.01 }}
+                        whileTap={{ scale: 0.99 }}
                         className="relative"
                       >
                         <label htmlFor="resume-upload-wizard" className="cursor-pointer">
@@ -587,40 +586,45 @@ export function MultiStepJobSearch({ isOpen, onClose, onComplete }: MultiStepJob
                             onChange={handleFileUpload}
                             className="sr-only"
                           />
-                          <div className="p-8 rounded-lg border-2 border-dashed hover:border-primary hover:bg-primary/5 transition-all text-center space-y-4">
-                            <div className="inline-flex p-3 rounded-full bg-blue-500/10">
-                              <Upload className="h-8 w-8 text-blue-500" />
+                          <div className="p-5 rounded-lg border hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-sm transition-all text-center space-y-3 bg-white dark:bg-gray-900">
+                            <div className="inline-flex p-2.5 rounded-lg bg-blue-50 dark:bg-blue-900/20">
+                              <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                             </div>
                             <div>
-                              <h3 className="font-semibold text-lg mb-2">Upload Existing Resume</h3>
-                              <p className="text-sm text-muted-foreground">
-                                Drag & drop or click to browse
+                              <h3 className="font-semibold text-base mb-1">Upload Resume</h3>
+                              <p className="text-xs text-muted-foreground">
+                                Select or drag your file
                               </p>
-                              <p className="text-xs text-muted-foreground mt-2">
-                                PDF, TXT, or Images
+                              <p className="text-xs text-gray-500 mt-1">
+                                PDF, TXT, or Image
                               </p>
                             </div>
                           </div>
                         </label>
                       </motion.div>
 
-                      {/* AI Resume Builder Card */}
+                      {/* Pro AI Interview Card */}
                       <motion.div
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
+                        whileHover={{ scale: 1.01 }}
+                        whileTap={{ scale: 0.99 }}
                         onClick={() => setShowVoiceBuilder(true)}
-                        className="p-8 rounded-lg border-2 border-dashed hover:border-primary hover:bg-primary/5 transition-all cursor-pointer text-center space-y-4"
+                        className="relative p-5 rounded-lg border hover:border-indigo-400 dark:hover:border-indigo-500 hover:shadow-sm transition-all cursor-pointer text-center space-y-3 bg-white dark:bg-gray-900"
                       >
-                        <div className="inline-flex p-3 rounded-full bg-purple-500/10">
-                          <Brain className="h-8 w-8 text-purple-500" />
+                        <div className="inline-flex p-2.5 rounded-lg bg-indigo-50 dark:bg-indigo-900/20">
+                          <UserCircle className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+                        </div>
+                        <div className="absolute top-3 right-3">
+                          <span className="px-1.5 py-0.5 rounded text-xs bg-indigo-600 text-white font-medium">
+                            PRO
+                          </span>
                         </div>
                         <div>
-                          <h3 className="font-semibold text-lg mb-2">Build with AI Interview</h3>
-                          <p className="text-sm text-muted-foreground">
-                            Answer questions to create resume
+                          <h3 className="font-semibold text-base mb-1">Pro AI Interview</h3>
+                          <p className="text-xs text-muted-foreground">
+                            Build resume via conversation
                           </p>
-                          <p className="text-xs text-muted-foreground mt-2">
-                            Voice or Text Input
+                          <p className="text-xs text-gray-500 mt-1">
+                            5 minutes
                           </p>
                         </div>
                       </motion.div>
