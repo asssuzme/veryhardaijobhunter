@@ -27,13 +27,13 @@ import {
   Link2,
   MapPin,
   Unlock,
-  AlertCircle
+  AlertCircle,
+  ArrowRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatCardSkeleton, Spinner } from "@/components/ui/loading-animations";
 import { Badge } from "@/components/ui/badge";
-import { JobScraper } from "@/components/job-scraper";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { MultiStepJobSearch } from "@/components/MultiStepJobSearch";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { format } from "date-fns";
 import type { JobScrapingRequest } from "@shared/schema";
@@ -106,10 +106,85 @@ export default function Home() {
     return null;
   }
 
-  // Use statistics from backend - no need to recalculate
-  
+  // Check if this is a new user (no searches)
+  const isNewUser = !stats?.recentSearches || stats.recentSearches.length === 0;
 
+  // Simplified landing for new users
+  if (isNewUser && !statsLoading) {
+    return (
+      <DashboardLayout user={user} onLogout={handleLogout} title="Dashboard">
+        <div className="min-h-[80vh] flex items-center justify-center">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5 }}
+            className="text-center space-y-8 max-w-2xl mx-auto px-4"
+          >
+            {/* Icon */}
+            <motion.div
+              initial={{ scale: 0.8 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 0.1, duration: 0.4 }}
+              className="inline-flex p-6 rounded-full bg-gradient-to-r from-primary/10 to-purple-500/10"
+            >
+              <Briefcase className="h-16 w-16 text-primary" />
+            </motion.div>
 
+            {/* Heading */}
+            <div className="space-y-4">
+              <motion.h1 
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.2 }}
+                className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent"
+              >
+                Find Your Dream Job
+              </motion.h1>
+              <motion.p 
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.3 }}
+                className="text-lg md:text-xl text-muted-foreground"
+              >
+                AI-powered job search that finds and applies to jobs for you
+              </motion.p>
+            </div>
+
+            {/* Single CTA Button */}
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.4 }}
+            >
+              <Button
+                onClick={() => setShowNewSearch(true)}
+                className="btn-primary h-14 px-8 text-lg shadow-lg hover:shadow-xl transition-all"
+                size="lg"
+              >
+                <Search className="h-5 w-5 mr-2" />
+                New Job Search
+                <ArrowRight className="h-5 w-5 ml-2" />
+              </Button>
+            </motion.div>
+          </motion.div>
+        </div>
+
+        {/* New Search Wizard */}
+        <MultiStepJobSearch 
+          isOpen={showNewSearch}
+          onClose={() => setShowNewSearch(false)}
+          onComplete={(requestId) => {
+            setShowNewSearch(false);
+            setTimeout(() => {
+              setLocation(`/results/${requestId}`);
+            }, 500);
+          }}
+        />
+      </DashboardLayout>
+    );
+  }
+
+  // Existing dashboard for users with search history
   return (
     <DashboardLayout user={user} onLogout={handleLogout} title="Dashboard">
       <motion.div
@@ -399,25 +474,17 @@ export default function Home() {
         </motion.div>
       </motion.div>
 
-      {/* New Search Dialog */}
-      <Dialog open={showNewSearch} onOpenChange={setShowNewSearch}>
-        <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl h-[85vh] sm:h-[90vh] p-0 flex flex-col">
-          <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-2 sm:pb-3 border-b flex-shrink-0">
-            <DialogTitle className="text-xl sm:text-2xl font-bold flex items-center gap-2">
-              <Search className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-              Start New Job Search
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-3 sm:py-4">
-            <JobScraper onComplete={(requestId) => {
-              setShowNewSearch(false);
-              setTimeout(() => {
-                setLocation(`/results/${requestId}`);
-              }, 500);
-            }} />
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* New Search Wizard */}
+      <MultiStepJobSearch 
+        isOpen={showNewSearch}
+        onClose={() => setShowNewSearch(false)}
+        onComplete={(requestId) => {
+          setShowNewSearch(false);
+          setTimeout(() => {
+            setLocation(`/results/${requestId}`);
+          }, 500);
+        }}
+      />
     </DashboardLayout>
   );
 }
