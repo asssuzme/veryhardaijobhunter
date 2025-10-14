@@ -1925,41 +1925,159 @@ Best,
     });
   });
   
-  // Voice Interview - Transcribe audio using OpenAI Whisper
+  // Voice Interview - Transcribe audio using OpenAI Whisper with enhanced error handling
   app.post("/api/resume/transcribe", requireAuth, upload.single('audio'), async (req, res) => {
     try {
       if (!req.file) {
-        return res.status(400).json({ error: "No audio file provided" });
+        return res.status(400).json({ 
+          error: "No audio file provided",
+          userMessage: "Please record your answer before submitting" 
+        });
+      }
+
+      // Check if OpenAI API key is configured
+      if (!process.env.OPENAI_API_KEY) {
+        console.error('[VOICE-TRANSCRIBE] OpenAI API key not configured');
+        return res.status(503).json({ 
+          error: "Transcription service unavailable",
+          userMessage: "Voice transcription is temporarily unavailable. Please use the text input option.",
+          allowRetry: false
+        });
       }
 
       const openai = new OpenAI({
-        apiKey: process.env.OPENAI_API_KEY || ''
+        apiKey: process.env.OPENAI_API_KEY
       });
 
+      // Log audio file details for debugging
+      console.log('[VOICE-TRANSCRIBE] Processing audio:', {
+        size: req.file.size,
+        type: req.file.mimetype,
+        userId: req.user?.id
+      });
+
+      // Validate file size (Whisper API limit is 25MB)
+      if (req.file.size > 25 * 1024 * 1024) {
+        return res.status(400).json({ 
+          error: "Audio file too large",
+          userMessage: "Recording is too long. Please record a shorter answer (max 25MB)",
+          allowRetry: true
+        });
+      }
+
       // Create a File object from the buffer for OpenAI
-      const file = new File([req.file.buffer], req.file.originalname || 'recording.webm', {
+      let fileName = req.file.originalname || 'recording.webm';
+      if (!fileName.includes('.')) {
+        const extension = req.file.mimetype?.split('/')[1] || 'webm';
+        fileName = `recording.${extension}`;
+      }
+
+      const file = new File([req.file.buffer], fileName, {
         type: req.file.mimetype || 'audio/webm'
       });
 
-      // Transcribe using Whisper API
-      const transcription = await openai.audio.transcriptions.create({
-        file: file,
-        model: "whisper-1",
-        language: "en",
-        temperature: 0.2, // Lower temperature for more accurate transcription
-      });
+      // Implement retry logic for transcription
+      let transcription;
+      let attempts = 0;
+      const maxAttempts = 3;
+      let lastError;
 
-      console.log('[VOICE-TRANSCRIBE] Successfully transcribed audio for user:', req.user?.id);
+      while (attempts < maxAttempts) {
+        attempts++;
+        try {
+          // Transcribe using Whisper API with optimized settings
+          transcription = await openai.audio.transcriptions.create({
+            file: file,
+            model: "whisper-1",
+            language: "en",
+            temperature: 0.2, // Lower temperature for more accurate transcription
+            prompt: req.body.questionId ? 
+              `Professional interview response about ${req.body.questionId}.` : 
+              undefined
+          });
+          
+          // Break if successful
+          if (transcription && transcription.text) {
+            break;
+          }
+        } catch (error) {
+          lastError = error;
+          console.error(`[VOICE-TRANSCRIBE] Attempt ${attempts} failed:`, error);
+          
+          // Check for specific error types
+          if (error instanceof Error) {
+            // Rate limiting error - don't retry
+            if (error.message.includes('rate limit')) {
+              return res.status(429).json({ 
+                error: "Rate limit exceeded",
+                userMessage: "Too many requests. Please wait a moment and try again.",
+                allowRetry: true,
+                retryAfter: 30000
+              });
+            }
+            
+            // Invalid audio format - don't retry
+            if (error.message.includes('invalid') || error.message.includes('format')) {
+              return res.status(400).json({ 
+                error: "Invalid audio format",
+                userMessage: "Audio format not supported. Please try recording again.",
+                allowRetry: true
+              });
+            }
+          }
+          
+          // Wait before retry (exponential backoff)
+          if (attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempts - 1)));
+          }
+        }
+      }
+
+      // If all attempts failed
+      if (!transcription || !transcription.text) {
+        console.error('[VOICE-TRANSCRIBE] All attempts failed:', lastError);
+        return res.status(500).json({ 
+          error: "Transcription failed",
+          userMessage: "Unable to transcribe audio. Please try again or use text input.",
+          attempts: attempts,
+          allowRetry: true
+        });
+      }
+
+      // Clean up the transcription text
+      let cleanedText = transcription.text.trim();
+      
+      // Remove common Whisper artifacts
+      cleanedText = cleanedText
+        .replace(/\[BLANK_AUDIO\]/gi, '')
+        .replace(/\[INAUDIBLE\]/gi, '')
+        .replace(/\[Music\]/gi, '')
+        .trim();
+
+      // Check if transcription is too short or empty
+      if (!cleanedText || cleanedText.length < 5) {
+        return res.status(400).json({ 
+          error: "No speech detected",
+          userMessage: "No clear speech was detected. Please speak clearly and try again.",
+          allowRetry: true
+        });
+      }
+
+      console.log('[VOICE-TRANSCRIBE] Success:', req.user?.id, 'Length:', cleanedText.length);
       
       res.json({ 
-        text: transcription.text,
-        questionId: req.body.questionId 
+        text: cleanedText,
+        questionId: req.body.questionId,
+        confidence: cleanedText.length > 20 ? 'high' : 'low',
+        attempts: attempts
       });
 
     } catch (error) {
-      console.error('[VOICE-TRANSCRIBE] Error:', error);
+      console.error('[VOICE-TRANSCRIBE] Unexpected error:', error);
       res.status(500).json({ 
         error: "Failed to transcribe audio",
+        userMessage: "An unexpected error occurred. Please try again or use text input.",
+        allowRetry: true,
         details: error instanceof Error ? error.message : 'Unknown error'
       });
     }
