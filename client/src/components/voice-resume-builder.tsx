@@ -725,124 +725,107 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
     }
   };
 
-  // Start Pro interview with Vapi
+  // Start Pro interview with Vapi - SIMPLIFIED VERSION
   const startProInterview = async () => {
     setErrorMessage('');
     setIsProMode(true);
     setMode('pro-interview');
     setVapiStatus('connecting');
     
-    console.log('Starting Pro Interview...');
+    console.log('🚀 Starting Pro Interview (Simplified)...');
     
     try {
-      // Start Vapi interview directly without payment checks
-      const response = await apiRequest('/api/resume/vapi/start-interview', {
-        method: 'POST',
-        body: JSON.stringify({
-          userName: localStorage.getItem('userName') || 'User'
-        })
-      });
-      
-      console.log('Vapi start response:', response);
-      
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to start interview');
-      }
-      
-      if (!response.assistantId) {
-        throw new Error('No assistant ID received from server');
-      }
-      
-      setVapiCallId(response.callId);
-      console.log('Call ID:', response.callId);
-      console.log('Assistant ID:', response.assistantId);
-      
-      // Initialize Vapi client with proper configuration
-      const publicKey = response.publicKey || process.env.VAPI_PUBLIC_KEY || '668f8fb5-3aac-45f9-ab43-591b20c985d4';
-      console.log('Using public key:', publicKey);
+      // Initialize Vapi with just the public key - no complex setup
+      const publicKey = '668f8fb5-3aac-45f9-ab43-591b20c985d4';
+      console.log('📌 Using public key:', publicKey);
       
       const vapi = new Vapi(publicKey);
       setVapiClient(vapi);
       
-      // Set up event listeners before starting
+      // Set up only the essential event listeners
       vapi.on('call-start', () => {
-        console.log('Vapi call started successfully');
+        console.log('✅ Vapi call started successfully!');
         setVapiStatus('connected');
         setErrorMessage('');
-        toast({
-          title: "Pro Interview Started",
-          description: "You can now have a natural conversation with our AI coach"
-        });
       });
-        
+      
       vapi.on('call-end', async () => {
-        console.log('Vapi call ended');
+        console.log('📞 Vapi call ended');
         setVapiStatus('ended');
-        // Fetch transcript and generate resume
-        if (response.callId) {
-          await handleVapiCallEnd(response.callId);
+        // Only generate resume if we have a valid call
+        if (vapiCallId) {
+          await handleVapiCallEnd(vapiCallId);
         }
       });
-        
-      vapi.on('speech-start', () => {
-        console.log('AI is speaking...');
-      });
-        
-      vapi.on('speech-end', () => {
-        console.log('AI finished speaking');
-      });
-        
-      vapi.on('volume-level', (level: number) => {
-        setVoiceLevel(level);
-      });
-        
+      
       vapi.on('error', (error: any) => {
-        console.error('Vapi error event:', error);
-        setErrorMessage(`Connection error: ${error.message || 'Please check your microphone and try again'}`);
-        setVapiStatus('ended');
-        toast({
-          title: "Connection Error",
-          description: error.message || "Failed to connect to AI coach",
-          variant: "destructive"
-        });
+        console.error('❌ Vapi error:', error);
+        console.error('Error details:', JSON.stringify(error, null, 2));
+        setErrorMessage(`Error: ${error.message || JSON.stringify(error) || 'Connection failed'}`);
       });
       
-      // Actually start the Vapi call - THIS WAS MISSING!
-      console.log('Starting Vapi call with assistant:', response.assistantId);
-      
-      // Add timeout for connection
-      const connectionTimeout = setTimeout(() => {
-        if (vapiStatus === 'connecting') {
-          console.error('Connection timeout - took too long to connect');
-          setErrorMessage('Connection timeout. Please check your network and try again.');
-          setVapiStatus('idle');
-          setMode('choice');
-          if (vapi) {
-            vapi.stop();
-          }
-        }
-      }, 30000); // 30 second timeout
+      // Try Method 1: Direct assistant ID (hardcoded for testing)
+      const assistantId = '86969d3b-28ef-4967-9841-3919f448c64c';
+      console.log('🎯 Attempting to start with assistant ID:', assistantId);
       
       try {
-        await vapi.start(response.assistantId);
-        clearTimeout(connectionTimeout);
-        console.log('Vapi start() called successfully');
+        // Simple start with just the assistant ID
+        await vapi.start(assistantId);
+        console.log('✅ Vapi.start() completed successfully with assistant ID');
+        setVapiCallId('temp-call-id'); // Set a temporary call ID
       } catch (startError: any) {
-        clearTimeout(connectionTimeout);
-        console.error('Failed to start Vapi:', startError);
-        throw new Error(`Failed to start call: ${startError.message || 'Unknown error'}`);
+        console.error('❌ Assistant ID method failed:', startError);
+        console.log('🔄 Trying inline configuration method...');
+        
+        // Method 2: Fallback to inline configuration
+        try {
+          const inlineConfig = {
+            transcriber: {
+              provider: 'deepgram',
+              model: 'nova-2',
+              language: 'en',
+            },
+            model: {
+              provider: 'openai',
+              model: 'gpt-3.5-turbo',
+              messages: [{
+                role: 'system',
+                content: `You are a professional career coach conducting a resume-building interview. 
+                         Ask the user about their work experience, education, skills, and career goals.
+                         Keep questions concise and conversational. 
+                         Start by asking for their name and current role.`
+              }],
+            },
+            voice: {
+              provider: '11labs',
+              voiceId: 'paula',
+            },
+          };
+          
+          console.log('📋 Using inline config:', JSON.stringify(inlineConfig, null, 2));
+          await vapi.start(inlineConfig as any);
+          console.log('✅ Vapi.start() completed successfully with inline config');
+          setVapiCallId('inline-config-call');
+        } catch (inlineError: any) {
+          console.error('❌ Inline config method also failed:', inlineError);
+          throw new Error(`Both methods failed. Last error: ${inlineError.message || JSON.stringify(inlineError)}`);
+        }
       }
       
     } catch (error: any) {
-      console.error('Error starting Pro interview:', error);
-      setErrorMessage(error.message || 'Failed to start interview');
+      console.error('❌ Complete failure in startProInterview:', error);
+      setVapiStatus('idle');
+      setMode('choice');
+      
+      // Detailed error message for debugging
+      const errorDetails = error.stack || error.message || JSON.stringify(error) || 'Unknown error';
+      setErrorMessage(`Failed to start: ${errorDetails}`);
+      
       toast({
-        title: "Error",
-        description: error.message || "Failed to start Pro interview. Please try again.",
+        title: "Connection Failed",
+        description: "Could not connect to AI coach. Check console for details.",
         variant: "destructive"
       });
-      setMode('choice');
-      setVapiStatus('idle');
     }
   };
 
@@ -884,12 +867,25 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
   };
 
   // End Pro interview
-  const endProInterview = () => {
-    if (vapiClient) {
-      vapiClient.stop();
+  const endProInterview = async () => {
+    console.log('🛑 Ending Pro Interview...');
+    try {
+      if (vapiClient) {
+        console.log('Stopping Vapi client...');
+        await vapiClient.stop();
+        console.log('✅ Vapi client stopped successfully');
+      }
+    } catch (error) {
+      console.error('Error stopping Vapi client:', error);
     }
+    
+    // Reset states regardless of stop result
     setMode('choice');
     setVapiStatus('idle');
+    setVapiClient(null);
+    setVapiCallId(null);
+    setErrorMessage('');
+    console.log('✅ States reset, back to choice mode');
   };
 
   // Pause/Resume interview
@@ -1587,9 +1583,18 @@ export function VoiceResumeBuilder({ isOpen, onClose, onUploadClick, onResumeGen
                         animate={{ opacity: 1, scale: 1 }}
                         className="flex flex-col items-center space-y-4"
                       >
-                        <CheckCircle className="h-16 w-16 text-green-400" />
-                        <p className="text-green-400 font-medium text-lg">Interview Complete!</p>
-                        <p className="text-gray-400">Processing your conversation...</p>
+                        <Loader2 className="h-16 w-16 text-yellow-400 animate-spin" />
+                        <p className="text-yellow-400 font-medium text-lg">Call Ended</p>
+                        <p className="text-gray-400">The conversation has ended. Processing may take a moment...</p>
+                        <Button
+                          onClick={() => {
+                            setMode('choice');
+                            setVapiStatus('idle');
+                          }}
+                          className="mt-4"
+                        >
+                          Back to Options
+                        </Button>
                       </motion.div>
                     )}
                   </div>
